@@ -754,38 +754,82 @@ export default function DepotManager() {
 
   return (
     <div style={{minHeight:"100vh",background:C.offWhite,color:C.navy}}>
-      <header style={{background:C.navy,color:"#fff",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 16px rgba(12,35,64,0.3)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <img src={DFDS_LOGO} alt="DFDS" style={{height:28,objectFit:"contain",}}/>
-          <div style={{width:"1px",height:26,background:"rgba(255,255,255,0.2)"}}/>
+
+      {/* ── HEADER MOBILE ── */}
+      <header style={{background:C.navy,color:"#fff",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:54,position:"fixed",top:0,left:0,right:0,zIndex:200,boxShadow:"0 2px 16px rgba(12,35,64,0.3)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <img src={DFDS_LOGO} alt="DFDS" style={{height:26,objectFit:"contain"}}/>
+          <div style={{width:"1px",height:22,background:"rgba(255,255,255,0.2)"}}/>
           <div>
-            <div style={{fontSize:12,fontWeight:700,letterSpacing:"0.08em",color:"#fff",textTransform:"uppercase",fontFamily:"sans-serif"}}>Depot Manager</div>
+            <div style={{fontSize:12,fontWeight:700,letterSpacing:"0.06em",color:"#fff",textTransform:"uppercase",fontFamily:"sans-serif"}}>Depot Manager</div>
             <div style={{fontSize:9,color:C.accent,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"sans-serif",fontWeight:600}}>{role==="chef"?t.chef_quai:t.comptable}</div>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{display:"flex",gap:4}}>
-            {["fr","en","tr"].map(l=><button key={l} onClick={()=>changeLang(l)} style={{background:lang===l?C.accent:"rgba(255,255,255,0.1)",border:"none",color:lang===l?C.navy:"rgba(255,255,255,0.7)",cursor:"pointer",padding:"4px 9px",borderRadius:6,fontSize:11,fontWeight:700,fontFamily:"sans-serif",transition:"all 0.15s"}}>{l.toUpperCase()}</button>)}
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{display:"flex",gap:3}}>
+            {["fr","en","tr"].map(l=><button key={l} onClick={()=>changeLang(l)} style={{background:lang===l?C.accent:"rgba(255,255,255,0.1)",border:"none",color:lang===l?C.navy:"rgba(255,255,255,0.7)",cursor:"pointer",padding:"3px 7px",borderRadius:5,fontSize:10,fontWeight:700,fontFamily:"sans-serif"}}>{l.toUpperCase()}</button>)}
           </div>
-          {role==="comptable"&&nbA>0&&<div style={{background:C.danger,color:"#fff",borderRadius:20,padding:"2px 9px",fontSize:11,fontFamily:"sans-serif",fontWeight:800}}>🔔 {nbA}</div>}
-          <div style={{fontSize:10,color:"#00d97e",fontFamily:"sans-serif",display:"flex",alignItems:"center",gap:4,fontWeight:600}}><div style={{width:6,height:6,borderRadius:"50%",background:"#00d97e"}}/>Cloud</div>
-          <button onClick={handleLogout} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"rgba(255,255,255,0.8)",cursor:"pointer",fontSize:11,padding:"5px 10px",borderRadius:6,fontFamily:"sans-serif",fontWeight:600}}>{t.deconnexion}</button>
+          {role==="comptable"&&nbA>0&&<div style={{background:C.danger,color:"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontFamily:"sans-serif",fontWeight:800}}>🔔 {nbA}</div>}
+          <div style={{fontSize:9,color:"#00d97e",fontFamily:"sans-serif",display:"flex",alignItems:"center",gap:3,fontWeight:600}}><div style={{width:5,height:5,borderRadius:"50%",background:"#00d97e"}}/>Cloud</div>
+          <button onClick={handleLogout} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"rgba(255,255,255,0.8)",cursor:"pointer",fontSize:10,padding:"4px 8px",borderRadius:5,fontFamily:"sans-serif",fontWeight:600}}>{t.deconnexion}</button>
         </div>
       </header>
-      <nav style={{background:C.white,borderBottom:"1px solid "+C.border,display:"flex",padding:"0 12px",overflowX:"auto",boxShadow:"0 1px 4px rgba(12,35,64,0.06)"}}>
-        {TABS.map(tb=>(<button key={tb.id} onClick={()=>setTab(tb.id)} style={{padding:"14px 16px",border:"none",background:"transparent",borderBottom:tab===tb.id?"3px solid "+C.navy:"3px solid transparent",color:tab===tb.id?C.navy:C.grayText,fontWeight:tab===tb.id?700:500,cursor:"pointer",fontSize:13,fontFamily:"sans-serif",whiteSpace:"nowrap",transition:"all 0.15s"}}>{tb.label}</button>))}
-        {(tab==="facture"||tab==="modifier")&&<button style={{padding:"14px 16px",border:"none",background:"transparent",borderBottom:"3px solid "+C.navy,color:C.navy,fontWeight:700,cursor:"default",fontSize:13,fontFamily:"sans-serif",whiteSpace:"nowrap"}}>{tab==="facture"?t.facture:t.modifier}</button>}
+
+      {/* ── LAYOUT PRINCIPAL ── */}
+      <div style={{display:"flex",paddingTop:54}}>
+
+        {/* ── SIDEBAR DESKTOP ── */}
+        <aside className="desktop-sidebar" style={{width:220,minHeight:"calc(100vh - 54px)",background:C.navy,position:"fixed",top:54,left:0,bottom:0,zIndex:100,display:"flex",flexDirection:"column",padding:"16px 0",overflowY:"auto"}}>
+          {TABS.map(tb=>{
+            const icons={"dossiers":"📁","nouveau":"➕","dashboard":"📊","export":"📄","clients":"👥","tarifs":"💶"};
+            const active=tab===tb.id||(tab==="facture"&&tb.id==="dossiers")||(tab==="modifier"&&tb.id==="nouveau");
+            return <button key={tb.id} onClick={()=>setTab(tb.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",border:"none",background:active?"rgba(232,160,32,0.15)":"transparent",color:active?C.accent:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:13,fontFamily:"sans-serif",fontWeight:active?700:400,borderLeft:active?"3px solid "+C.accent:"3px solid transparent",textAlign:"left",transition:"all 0.15s"}}>
+              <span style={{fontSize:16}}>{icons[tb.id]||"•"}</span>
+              {tb.label}
+            </button>;
+          })}
+          <div style={{marginTop:"auto",padding:"16px 20px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",fontFamily:"sans-serif",marginBottom:4}}>DFDS · Sète</div>
+            <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"sans-serif"}}>v2.0 — 2026</div>
+          </div>
+        </aside>
+
+        {/* ── CONTENU PRINCIPAL ── */}
+        <main className="main-content" style={{flex:1,marginLeft:220,padding:"20px 24px",minHeight:"calc(100vh - 54px)",maxWidth:"100%",boxSizing:"border-box"}}>
+          {tab==="dossiers"&&<PageDossiers dossiers={dossiers} clients={clients} tarifs={tarifs} role={role} lang={lang} t={t} onVoirFacture={d=>{setFactureOuverte(d);setTab("facture");}} setDossiers={setDossiers} onModifier={handleModifier}/>}
+          {tab==="nouveau"&&role==="chef"&&<FormDossier clients={clients} tarifs={tarifs} onSave={saveDossier} t={t}/>}
+          {tab==="modifier"&&editingDossier&&<FormDossier clients={clients} tarifs={tarifs} dossierInitial={editingDossier} onSave={saveDossier} onCancel={()=>setTab("dossiers")} t={t}/>}
+          {tab==="dashboard"&&<PageDashboard dossiers={dossiers} clients={clients} tarifs={tarifs} t={t} lang={lang}/>}
+          {tab==="export"&&<PageExport dossiers={dossiers} clients={clients} tarifs={tarifs} t={t} lang={lang}/>}
+          {tab==="clients"&&role==="chef"&&<PageClients clients={clients} setClients={setClients} t={t}/>}
+          {tab==="tarifs"&&role==="chef"&&<PageTarifs tarifs={tarifs} setTarifs={setTarifs} t={t}/>}
+          {tab==="facture"&&factureOuverte&&<PageFacture dossier={factureOuverte} clients={clients} tarifs={tarifs} role={role} setDossiers={setDossiers} onRetour={()=>setTab("dossiers")} t={t}/>}
+        </main>
+      </div>
+
+      {/* ── BARRE NAVIGATION BAS MOBILE ── */}
+      <style>{`
+        @media (min-width: 768px) {
+          .mobile-nav { display: none !important; }
+          .desktop-sidebar { display: flex !important; }
+        }
+        @media (max-width: 767px) {
+          .desktop-sidebar { display: none !important; }
+          .mobile-nav { display: flex !important; }
+          .main-content { margin-left: 0 !important; padding: 12px !important; padding-bottom: 80px !important; }
+        }
+      `}</style>
+      <nav className="mobile-nav" style={{display:"none",position:"fixed",bottom:0,left:0,right:0,background:C.navy,borderTop:"1px solid rgba(255,255,255,0.1)",zIndex:200,padding:"6px 0 8px"}}>
+        {TABS.slice(0,role==="chef"?5:3).map(tb=>{
+          const icons={"dossiers":"📁","nouveau":"➕","dashboard":"📊","export":"📄","clients":"👥","tarifs":"💶"};
+          const active=tab===tb.id||(tab==="facture"&&tb.id==="dossiers")||(tab==="modifier"&&tb.id==="nouveau");
+          return <button key={tb.id} onClick={()=>setTab(tb.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 2px",border:"none",background:"transparent",color:active?C.accent:"rgba(255,255,255,0.5)",cursor:"pointer",fontFamily:"sans-serif",fontSize:9,fontWeight:active?700:400}}>
+            <span style={{fontSize:20}}>{icons[tb.id]}</span>
+            {tb.label.length>8?tb.label.slice(0,8)+"…":tb.label}
+          </button>;
+        })}
       </nav>
-      <main style={{padding:"20px 16px",maxWidth:1100,margin:"0 auto"}}>
-        {tab==="dossiers"&&<PageDossiers dossiers={dossiers} clients={clients} tarifs={tarifs} role={role} lang={lang} t={t} onVoirFacture={d=>{setFactureOuverte(d);setTab("facture");}} setDossiers={setDossiers} onModifier={handleModifier}/>}
-        {tab==="nouveau"&&role==="chef"&&<FormDossier clients={clients} tarifs={tarifs} onSave={saveDossier} t={t}/>}
-        {tab==="modifier"&&editingDossier&&<FormDossier clients={clients} tarifs={tarifs} dossierInitial={editingDossier} onSave={saveDossier} onCancel={()=>setTab("dossiers")} t={t}/>}
-        {tab==="dashboard"&&<PageDashboard dossiers={dossiers} clients={clients} tarifs={tarifs} t={t} lang={lang}/>}
-        {tab==="export"&&<PageExport dossiers={dossiers} clients={clients} tarifs={tarifs} t={t} lang={lang}/>}
-        {tab==="clients"&&role==="chef"&&<PageClients clients={clients} setClients={setClients} t={t}/>}
-        {tab==="tarifs"&&role==="chef"&&<PageTarifs tarifs={tarifs} setTarifs={setTarifs} t={t}/>}
-        {tab==="facture"&&factureOuverte&&<PageFacture dossier={factureOuverte} clients={clients} tarifs={tarifs} role={role} setDossiers={setDossiers} onRetour={()=>setTab("dossiers")} t={t}/>}
-      </main>
     </div>
   );
 }
+
