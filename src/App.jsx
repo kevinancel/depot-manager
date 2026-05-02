@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -216,6 +216,9 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
   const [fraisSupp,setFraisSupp]=useState(dossierInitial?.fraisSupp||[]);
   const [mvt,setMvt]=useState({type:"entree",date:today(),palettes:1,provenance:"",transporteur:"",poids:""});
   const [frais,setFrais]=useState({desc:"",type:"libre",montant:0,qty:1,pu:0});
+  const [photos,setPhotos]=useState(dossierInitial?.photos||[]);
+  const photoRef=useRef(null);
+  const addPhotos=(files)=>{Array.from(files).forEach(file=>{const reader=new FileReader();reader.onload=(e)=>setPhotos(ph=>[...ph,{id:Date.now()+Math.random(),name:file.name,data:e.target.result}]);reader.readAsDataURL(file);});};
   const [erreur,setErreur]=useState("");
   const addMvt=()=>{if(mvt.palettes<1)return;setMouvements(m=>[...m,{...mvt,id:Date.now()}]);setMvt(v=>({...v,palettes:1,provenance:"",transporteur:"",poids:""}));};
   const addFrais=()=>{if(!frais.desc)return;const total=frais.type==="libre"?+frais.montant:+frais.qty*+frais.pu;setFraisSupp(f=>[...f,{...frais,total,id:Date.now()}]);setFrais({desc:"",type:"libre",montant:0,qty:1,pu:0});};
@@ -229,7 +232,7 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
       dateCreation:dossierInitial?.dateCreation||today(),statut:so>=e?"clos":"ouvert",
       tvaClient:clientObj.tva,statutFacture:wasValidee?"modifiee":(dossierInitial?.statutFacture||null)};
     const lignesSnap=genFacture({...dossierBase,lignesSnap:null},tarifs).lignes;
-    onSave({...dossierBase,lignesSnap});
+    onSave({...dossierBase,lignesSnap,photos});
   };
   const clientObj=clients.find(c=>c.nom===form.client);
   return (
@@ -308,6 +311,22 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
               <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{fontWeight:700,color:C.accent,fontFamily:"sans-serif"}}>{(f.total||f.montant||0).toFixed(2)} € HT</span><button onClick={()=>setFraisSupp(fs=>fs.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:20}}>✕</button></div>
             </div>
           ))}
+      </div>
+      <div style={sf.card}>
+        <div style={sf.sec}>📷 Photos des palettes</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}> 
+          {photos.map((p,i)=>(
+            <div key={p.id} style={{position:"relative"}}>
+              <img src={p.data} alt={p.name} style={{width:90,height:90,objectFit:"cover",borderRadius:8,border:"1.5px solid "+C.border}}/>
+              <button onClick={()=>setPhotos(ph=>ph.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,cursor:"pointer",fontSize:13,fontWeight:700}}>✕</button>
+            </div>
+          ))}
+          <button onClick={()=>photoRef.current?.click()} style={{width:90,height:90,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>
+            <span style={{fontSize:24}}>📷</span>
+            <span>Ajouter</span>
+          </button>
+        </div>
+        <input ref={photoRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
       </div>
       <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingBottom:32}}>
         {onCancel&&<button style={sf.btn("ghost")} onClick={onCancel}>{t.annuler}</button>}
@@ -418,6 +437,9 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
                 <span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {m.date}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>
               ))}
             </div>
+            {(d.photos||[]).length>0&&<div style={{padding:"6px 18px 10px",display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid "+C.border,background:C.offWhite}}>
+              {(d.photos||[]).map((p,i)=><img key={i} src={p.data} alt={p.name} style={{height:48,width:64,objectFit:"cover",borderRadius:6,border:"1px solid "+C.border}}/>)}
+            </div>}
           </div>;
         })}
       </div>
@@ -447,7 +469,7 @@ function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
       <div style={sf.card}>
         <div style={{background:C.navy,color:"#fff",borderRadius:10,padding:"24px 28px",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:28,flexWrap:"wrap",gap:16}}>
           <div>
-            <img src={DFDS_LOGO} alt="DFDS" style={{height:34,objectFit:"contain",marginBottom:12,filter:"brightness(0) invert(1)"}}/>
+            <img src={DFDS_LOGO} alt="DFDS" style={{height:34,objectFit:"contain",marginBottom:12,}}/>
             <div style={{fontSize:18,fontWeight:800,letterSpacing:"0.02em"}}>DÉPÔT HORS DFDS</div>
             <div style={{color:"#94a3b8",fontSize:12,fontFamily:"sans-serif",marginTop:4}}>{t.zone_portuaire}</div>
           </div>
@@ -696,7 +718,7 @@ export default function DepotManager() {
     async function charger(){
       const {data:d}=await supabase.from("dossiers").select("*");
       const {data:c}=await supabase.from("clients").select("*");
-      if(d) setDossiers(d.map(x=>({...x,dateCreation:x.date_creation,invoiceRef:x.invoice_ref,fraisSupp:x.frais_supp||[],lignesSnap:x.lignes_snap||null,tvaClient:x.tva_client,statutFacture:x.statut_facture||null})));
+      if(d) setDossiers(d.map(x=>({...x,dateCreation:x.date_creation,invoiceRef:x.invoice_ref,fraisSupp:x.frais_supp||[],lignesSnap:x.lignes_snap||null,tvaClient:x.tva_client,statutFacture:x.statut_facture||null,photos:x.photos||[]})));
       if(c&&c.length>0) setClients(c.map(x=>({...x,numero:x.numero||""})));
       setChargement(false);
     }
@@ -709,7 +731,7 @@ export default function DepotManager() {
       palettisation:d.palettisation,depotage:d.depotage,statut:d.statut,
       date_creation:d.dateCreation,mouvements:d.mouvements,
       frais_supp:d.fraisSupp||[],lignes_snap:d.lignesSnap||null,
-      tva_client:d.tvaClient,statut_facture:d.statutFacture||null
+      tva_client:d.tvaClient,statut_facture:d.statutFacture||null,photos:d.photos||[]
     });
     setDossiers(ds=>{const idx=ds.findIndex(x=>x.id===d.id);if(idx>=0){const n=[...ds];n[idx]=d;return n;}return [d,...ds];});
     setEditingDossier(null); setTab("dossiers");
@@ -725,7 +747,7 @@ export default function DepotManager() {
 
   if(chargement) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:C.navy,flexDirection:"column",gap:16}}>
-      <img src={DFDS_LOGO} alt="DFDS" style={{height:48,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
+      <img src={DFDS_LOGO} alt="DFDS" style={{height:48,objectFit:"contain",}}/>
       <div style={{fontFamily:"sans-serif",color:"rgba(255,255,255,0.5)",fontSize:14,letterSpacing:"0.05em"}}>Chargement…</div>
     </div>
   );
@@ -734,7 +756,7 @@ export default function DepotManager() {
     <div style={{minHeight:"100vh",background:C.offWhite,color:C.navy}}>
       <header style={{background:C.navy,color:"#fff",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 16px rgba(12,35,64,0.3)"}}>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <img src={DFDS_LOGO} alt="DFDS" style={{height:28,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
+          <img src={DFDS_LOGO} alt="DFDS" style={{height:28,objectFit:"contain",}}/>
           <div style={{width:"1px",height:26,background:"rgba(255,255,255,0.2)"}}/>
           <div>
             <div style={{fontSize:12,fontWeight:700,letterSpacing:"0.08em",color:"#fff",textTransform:"uppercase",fontFamily:"sans-serif"}}>Depot Manager</div>
