@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -183,307 +183,18 @@ function Badge({sf2, t}) {
   return <span style={sf.pill(st.color,st.bg)}>{icons[sf2]||"📝"} {st.label}</span>;
 }
 
-
-// ─── ASSISTANT IA VOCAL + SCAN ────────────────────────────────────────────────
-function AssistantIA({clients, tarifs, onDossierCree, t}) {
-  const [ecoute, setEcoute] = useState(false);
-  const [transcription, setTranscription] = useState("");
-  const [analyse, setAnalyse] = useState(null);
-  const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const fileRef = useRef(null);
-  const videoRef = useRef(null);
-  const [showCamera, setShowCamera] = useState(false);
-
-  // ── Reconnaissance vocale ──
-  const startEcoute = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert("Votre navigateur ne supporte pas la reconnaissance vocale."); return; }
-    const rec = new SR();
-    rec.lang = "fr-FR"; rec.continuous = false; rec.interimResults = false;
-    rec.onstart = () => setEcoute(true);
-    rec.onend = () => setEcoute(false);
-    rec.onresult = (e) => {
-      const txt = e.results[0][0].transcript;
-      setTranscription(txt);
-      analyserTexte(txt);
-    };
-    rec.start();
-  };
-
-  // ── Analyse texte par IA ──
-  const analyserTexte = async (texte) => {
-    setLoading(true);
-    try {
-      const clientsListe = clients.map(c => c.nom).join(", ");
-      const res = await fetch("https://dfds-proxy.kevinancel.workers.dev", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 500,
-          system: `Tu es un assistant logistique. Extrais les infos d'un mouvement de palettes depuis un texte.
-Clients disponibles: ${clientsListe}
-Réponds UNIQUEMENT en JSON valide, sans texte autour:
-{"client":"NOM_CLIENT","palettes":5,"type":"entree","transporteur":"AB-123-CD","poids":1500,"provenance":"RTP France","invoiceRef":""}
-Si une info est manquante, mets null. type est "entree" ou "sortie".`,
-          messages: [{role:"user", content: texte}]
-        })
-      });
-      const data = await res.json();
-      const txt = data.content?.[0]?.text || "{}";
-      const clean = txt.replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(clean);
-      setAnalyse(parsed);
-    } catch(e) { console.error(e); }
-    setLoading(false);
-  };
-
-  // ── Scan document ──
-  const compressImage = (file, maxWidth=1800, quality=0.85) => new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ratio = Math.min(maxWidth/img.width, maxWidth/img.height, 1);
-        canvas.width = img.width * ratio;
-        canvas.height = img.height * ratio;
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
-
-  const scanDocument = async (file) => {
-    if (!file) return;
-    setScanning(true); setScanResult(null);
-    try {
-      const compressed = await compressImage(file);
-      const b64 = compressed.split(",")[1];
-      const res = await fetch("https://dfds-proxy.kevinancel.workers.dev", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 600,
-          system: `Tu es un expert en documents logistiques (CMR, lettres de voiture, BL) multilingues (français, anglais, turc).
-Le document est reçu au dépôt DFDS à Sète, France.
-
-RÈGLES IMPORTANTES:
-- "type" est TOUJOURS "entree" (on reçoit la marchandise au dépôt)
-- "client" = la société de transport/commissionnaire qui nous mandate, visible dans la case "Transporteur" ou "Carrier" ou logo transporteur (case 16 du CMR). Cherche parmi les clients connus: ${clients.map(c=>c.nom).join(", ")}
-- "provenance" = l'EXPÉDITEUR de la marchandise (case 1, "Sender", "Expéditeur", "Gönderici") — nom société + ville
-- "destinataire" = le DESTINATAIRE final (case 2, "Consignee", "Destinataire", "Alıcı") — nom société + ville
-- "transporteur" = numéro de plaque du camion uniquement (format XX-XXX-XX ou XX XXX XXX, cherche "plaque", "plate", "plaka", "Çekici/Araç plaka")
-- "poids" = poids en kg (nombre uniquement, cherche "kg", "gross weight", "poids brut")
-- "palettes" = nombre de palettes (nombre entier, cherche "PALET", "palette", "pallet", "packages")
-- "invoiceRef" = laisser NULL (sera rempli manuellement plus tard)
-- "dateDoc" = date du document (format YYYY-MM-DD)
-
-Réponds UNIQUEMENT en JSON valide, sans texte autour:
-{"client":null,"palettes":null,"type":"entree","transporteur":null,"poids":null,"provenance":null,"destinataire":null,"invoiceRef":null,"dateDoc":null}`,
-          messages: [{role:"user", content:[
-            {type:"image", source:{type:"base64", media_type:"image/jpeg", data:b64}},
-            {type:"text", text:"Extrais les informations logistiques de ce document."}
-          ]}]
-        })
-      });
-      const data = await res.json();
-      const txt = data.content?.[0]?.text || "{}";
-      const clean = txt.replace(/```json|```/g,"").trim();
-      const parsed = JSON.parse(clean);
-      setScanResult({...parsed, imageB64: compressed, fileName: file.name});
-      setScanning(false);
-    } catch(e) { console.error(e); setScanning(false); }
-  };
-
-  const creerDepuisAnalyse = (data) => {
-    // Cherche le client dans la liste, sinon prend le premier
-    const clientObj = clients.find(c =>
-      data.client && c.nom.toLowerCase().includes(data.client.toLowerCase())
-    ) || clients.find(c =>
-      data.client && data.client.toLowerCase().includes(c.nom.toLowerCase())
-    ) || clients[0];
-
-    const mvt = {
-      type: "entree",
-      date: data.dateDoc || new Date().toISOString().slice(0,10),
-      palettes: parseInt(data.palettes) || 1,
-      provenance: data.provenance || "",
-      transporteur: data.transporteur || "",
-      poids: data.poids ? String(data.poids) : "",
-      id: Date.now()
-    };
-
-    const notes = [
-      data.destinataire ? "Destinataire: "+data.destinataire : "",
-    ].filter(Boolean).join(" | ");
-
-    onDossierCree({
-      client: clientObj?.nom || clients[0]?.nom,
-      invoiceRef: "",
-      notes: notes,
-      palettisation: 0,
-      depotage: 0,
-      mouvements: [mvt],
-      fraisSupp: [],
-      imageDoc: data.imageB64 || null,
-      imageDocName: data.fileName || null,
-    });
-    setAnalyse(null); setScanResult(null); setTranscription("");
-  };
-
-  return (
-    <div style={{marginBottom:16}}>
-      {/* Bandeau IA */}
-      <div style={{background:"linear-gradient(135deg,#0C2340,#1a3a5c)",borderRadius:12,padding:"20px 24px",marginBottom:12,boxShadow:"0 4px 20px rgba(12,35,64,0.2)"}}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
-          <div>
-            <div style={{fontSize:15,fontWeight:800,color:"#fff",fontFamily:"sans-serif"}}>🤖 Assistant IA</div>
-            <div style={{fontSize:12,color:"rgba(255,255,255,0.6)",fontFamily:"sans-serif",marginTop:2}}>Vocal ou scan — création automatique de dossier</div>
-          </div>
-          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-            <button onClick={startEcoute} disabled={ecoute||loading} style={{background:ecoute?"#dc2626":C.accent,border:"none",color:ecoute?"#fff":C.navy,cursor:"pointer",padding:"10px 18px",borderRadius:8,fontSize:13,fontWeight:700,fontFamily:"sans-serif",display:"flex",alignItems:"center",gap:6}}>
-              {ecoute ? "🔴 Écoute..." : "🎤 Parler"}
-            </button>
-            <button onClick={()=>fileRef.current?.click()} disabled={scanning||loading} style={{background:"rgba(255,255,255,0.12)",border:"1.5px solid rgba(255,255,255,0.3)",color:"#fff",cursor:"pointer",padding:"10px 18px",borderRadius:8,fontSize:13,fontWeight:700,fontFamily:"sans-serif",display:"flex",alignItems:"center",gap:6}}>
-              {scanning ? "⏳ Analyse..." : "📸 Scanner doc"}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" style={{display:"none"}} onChange={e=>scanDocument(e.target.files[0])}/>
-          </div>
-        </div>
-        {transcription&&<div style={{marginTop:12,background:"rgba(255,255,255,0.08)",borderRadius:8,padding:"10px 14px",fontFamily:"sans-serif",fontSize:13,color:"rgba(255,255,255,0.9)",fontStyle:"italic"}}>"{transcription}"</div>}
-        {loading&&<div style={{marginTop:10,fontFamily:"sans-serif",fontSize:12,color:"rgba(255,255,255,0.6)"}}>⏳ Analyse en cours...</div>}
-      </div>
-
-      {/* Résultat analyse vocale */}
-      {analyse&&(
-        <div style={{background:"#f0fdf4",border:"2px solid #16a34a",borderRadius:12,padding:"18px 20px",marginBottom:12}}>
-          <div style={{fontWeight:700,color:"#166534",fontFamily:"sans-serif",fontSize:14,marginBottom:12}}>✅ J'ai détecté :</div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:14}}>
-            {[
-              {label:"Client",val:analyse.client},
-              {label:"Palettes",val:analyse.palettes},
-              {label:"Type",val:analyse.type==="entree"?"↓ Entrée":"↑ Sortie"},
-              {label:"Transporteur",val:analyse.transporteur},
-              {label:"Poids",val:analyse.poids?analyse.poids+" kg":null},
-              {label:"Provenance",val:analyse.provenance},
-            ].filter(x=>x.val).map(x=>(
-              <div key={x.label} style={{background:"#fff",borderRadius:8,padding:"8px 12px",fontFamily:"sans-serif"}}>
-                <div style={{fontSize:10,color:"#6b7280",fontWeight:700,textTransform:"uppercase"}}>{x.label}</div>
-                <div style={{fontSize:14,fontWeight:700,color:C.navy,marginTop:2}}>{x.val}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{display:"flex",gap:10}}>
-            <button onClick={()=>creerDepuisAnalyse(analyse)} style={{background:C.navy,color:"#fff",border:"none",cursor:"pointer",padding:"10px 20px",borderRadius:8,fontSize:13,fontWeight:700,fontFamily:"sans-serif"}}>✓ Créer le dossier</button>
-            <button onClick={()=>{setAnalyse(null);setTranscription("");}} style={{background:"transparent",color:"#6b7280",border:"1px solid #e2e8f0",cursor:"pointer",padding:"10px 16px",borderRadius:8,fontSize:13,fontFamily:"sans-serif"}}>Annuler</button>
-          </div>
-        </div>
-      )}
-
-      {/* Résultat scan document */}
-      {scanResult&&(
-        <div style={{background:"#eff6ff",border:"2px solid #2563eb",borderRadius:12,padding:"18px 20px",marginBottom:12}}>
-          <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
-            {scanResult.imageB64&&<img src={scanResult.imageB64} alt="doc" style={{width:120,height:90,objectFit:"cover",borderRadius:8,flexShrink:0}}/>}
-            <div style={{flex:1}}>
-              <div style={{fontWeight:700,color:"#1e40af",fontFamily:"sans-serif",fontSize:14,marginBottom:10}}>📄 Document analysé : {scanResult.fileName}</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:12}}>
-                {[
-                  {label:"Client",val:scanResult.client},
-                  {label:"Palettes",val:scanResult.palettes},
-                  {label:"Type",val:scanResult.type==="entree"?"↓ Entrée":"↑ Sortie"},
-                  {label:"Destinataire",val:scanResult.destinataire},
-                  {label:"Transporteur/Plaque",val:scanResult.transporteur},
-                  {label:"Provenance",val:scanResult.provenance},
-                  {label:"Poids",val:scanResult.poids?scanResult.poids+" kg":null},
-                  {label:"Date doc",val:scanResult.dateDoc},
-                ].filter(x=>x.val).map(x=>(
-                  <div key={x.label} style={{background:"#fff",borderRadius:8,padding:"7px 10px",fontFamily:"sans-serif"}}>
-                    <div style={{fontSize:10,color:"#6b7280",fontWeight:700,textTransform:"uppercase"}}>{x.label}</div>
-                    <div style={{fontSize:13,fontWeight:700,color:C.navy,marginTop:2}}>{x.val}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:10}}>
-                <button onClick={()=>creerDepuisAnalyse(scanResult)} style={{background:C.navy,color:"#fff",border:"none",cursor:"pointer",padding:"10px 20px",borderRadius:8,fontSize:13,fontWeight:700,fontFamily:"sans-serif"}}>✓ Créer le dossier</button>
-                <button onClick={()=>setScanResult(null)} style={{background:"transparent",color:"#6b7280",border:"1px solid #e2e8f0",cursor:"pointer",padding:"10px 16px",borderRadius:8,fontSize:13,fontFamily:"sans-serif"}}>Annuler</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── COMPOSANT PHOTOS DOSSIER ──────────────────────────────────────────────────
-function PhotosDossier({dossierMonId, photos, onPhotosChange}) {
-  const fileRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
-
-  const handleFiles = async (files) => {
-    setUploading(true);
-    const newPhotos = [...(photos||[])];
-    for (const file of Array.from(files)) {
-      await new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          newPhotos.push({
-            id: Date.now()+Math.random(),
-            name: file.name,
-            data: e.target.result,
-            type: file.type,
-            date: new Date().toISOString().slice(0,10)
-          });
-          resolve();
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-    onPhotosChange(newPhotos);
-    setUploading(false);
-  };
-
-  const removePhoto = (id) => onPhotosChange((photos||[]).filter(p=>p.id!==id));
-
-  return (
-    <div>
-      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
-        {(photos||[]).map(p=>(
-          <div key={p.id} style={{position:"relative",width:90,height:90}}>
-            <img src={p.data} alt={p.name} style={{width:90,height:90,objectFit:"cover",borderRadius:8,border:"1.5px solid "+C.border}}/>
-            <button onClick={()=>removePhoto(p.id)} style={{position:"absolute",top:-6,right:-6,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,cursor:"pointer",fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700}}>✕</button>
-            <div style={{fontSize:9,color:C.grayText,textAlign:"center",marginTop:2,fontFamily:"sans-serif",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:90}}>{p.name}</div>
-          </div>
-        ))}
-        <button onClick={()=>fileRef.current?.click()} disabled={uploading} style={{width:90,height:90,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>
-          {uploading?"⏳":"📷"}
-          <span>{uploading?"...":"Ajouter"}</span>
-        </button>
-      </div>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={e=>handleFiles(e.target.files)}/>
-    </div>
-  );
-}
-
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 function PageLogin({onLogin}) {
   const [code,setCode]=useState(""); const [err,setErr]=useState(""); const [lang,setLang]=useState("fr");
   const t=T[lang]; const handle=()=>{const r=CODES[code.trim().toUpperCase()];if(r)onLogin(r,lang);else setErr(t.code_incorrect);};
   return (
     <div style={{minHeight:"100vh",background:C.navy,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{background:C.white,borderRadius:20,padding:"36px 32px",width:"100%",maxWidth:400,boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
-        <div style={{display:"flex",justifyContent:"center",gap:8,marginBottom:28}}>
-          {["fr","en","tr"].map(l=><button key={l} onClick={()=>setLang(l)} style={{background:lang===l?C.navy:"#f1f5f9",border:"none",color:lang===l?"#fff":C.grayText,cursor:"pointer",padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:"sans-serif"}}>{{fr:"🇫🇷 FR",en:"🇬🇧 EN",tr:"🇹🇷 TR"}[l]}</button>)}
-        </div>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <img src={DFDS_LOGO} alt="DFDS" style={{height:52,objectFit:"contain",display:"block",margin:"0 auto 16px"}}/>
+      <div style={{position:"absolute",top:16,right:16,display:"flex",gap:6}}>
+        {["fr","en","tr"].map(l=><button key={l} onClick={()=>setLang(l)} style={{background:lang===l?C.accent:"rgba(255,255,255,0.12)",border:"none",color:lang===l?C.navy:"rgba(255,255,255,0.8)",cursor:"pointer",padding:"5px 11px",borderRadius:20,fontSize:12,fontWeight:700,fontFamily:"sans-serif"}}>{{fr:"🇫🇷 FR",en:"🇬🇧 EN",tr:"🇹🇷 TR"}[l]}</button>)}
+      </div>
+      <div style={{background:C.white,borderRadius:20,padding:"44px 40px",width:"100%",maxWidth:400,boxShadow:"0 24px 80px rgba(0,0,0,0.4)"}}>
+        <div style={{textAlign:"center",marginBottom:36}}>
+          <img src={DFDS_LOGO} alt="DFDS" style={{height:50,objectFit:"contain",marginBottom:20,display:"block",margin:"0 auto 20px"}}/>
           <div style={{fontSize:11,color:C.grayText,fontFamily:"sans-serif",letterSpacing:"0.14em",textTransform:"uppercase",fontWeight:700}}>DEPOT MANAGER</div>
           <div style={{fontSize:10,color:C.grayMid,fontFamily:"sans-serif",marginTop:4,letterSpacing:"0.08em",textTransform:"uppercase"}}>{t.acces_securise}</div>
         </div>
@@ -500,7 +211,7 @@ function PageLogin({onLogin}) {
 // ─── FORM DOSSIER ─────────────────────────────────────────────────────────────
 function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
   const editing=!!dossierInitial;
-  const [form,setForm]=useState(dossierInitial?{client:dossierInitial.client,invoiceRef:dossierInitial.invoiceRef||"",notes:dossierInitial.notes||"",palettisation:dossierInitial.palettisation||0,depotage:dossierInitial.depotage||0,_photos:dossierInitial.photos||[]}:{client:clients[0]?.nom||"",invoiceRef:"",notes:"",palettisation:0,depotage:0,_photos:[]});
+  const [form,setForm]=useState(dossierInitial?{client:dossierInitial.client,invoiceRef:dossierInitial.invoiceRef||"",notes:dossierInitial.notes||"",palettisation:dossierInitial.palettisation||0,depotage:dossierInitial.depotage||0}:{client:clients[0]?.nom||"",invoiceRef:"",notes:"",palettisation:0,depotage:0});
   const [mouvements,setMouvements]=useState(dossierInitial?.mouvements||[]);
   const [fraisSupp,setFraisSupp]=useState(dossierInitial?.fraisSupp||[]);
   const [mvt,setMvt]=useState({type:"entree",date:today(),palettes:1,provenance:"",transporteur:"",poids:""});
@@ -518,7 +229,7 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
       dateCreation:dossierInitial?.dateCreation||today(),statut:so>=e?"clos":"ouvert",
       tvaClient:clientObj.tva,statutFacture:wasValidee?"modifiee":(dossierInitial?.statutFacture||null)};
     const lignesSnap=genFacture({...dossierBase,lignesSnap:null},tarifs).lignes;
-    onSave({...dossierBase,lignesSnap,photos:form._photos||dossierInitial?.photos||[]});
+    onSave({...dossierBase,lignesSnap});
   };
   const clientObj=clients.find(c=>c.nom===form.client);
   return (
@@ -564,6 +275,8 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
                 {m.poids&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>⚖️ {m.poids}kg</span>}
                 {m.transporteur&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>🚛 {m.transporteur}</span>}
                 {m.provenance&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>· {m.provenance}</span>}
+                {m.transporteur&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>🚛 {m.transporteur}</span>}
+                {m.poids&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>⚖️ {m.poids} kg</span>}
               </div>
               <button onClick={()=>setMouvements(ms=>ms.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:C.danger,cursor:"pointer",fontSize:20}}>✕</button>
             </div>
@@ -596,18 +309,6 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
             </div>
           ))}
       </div>
-      <div style={sf.card}>
-        <div style={sf.sec}>📷 Photos & Documents associés</div>
-        <PhotosDossier
-          dossierMonId={dossierInitial?.id||null}
-          photos={form._photos||[]}
-          onPhotosChange={ph=>setForm(f=>({...f,_photos:ph}))}
-        />
-        {dossierInitial?.imageDoc&&<div style={{marginTop:10}}>
-          <div style={{fontSize:11,color:C.grayText,fontFamily:"sans-serif",marginBottom:6,fontWeight:700,textTransform:"uppercase"}}>Document scanné</div>
-          <img src={dossierInitial.imageDoc} alt="doc" style={{height:80,objectFit:"cover",borderRadius:8,border:"1.5px solid "+C.border}}/>
-        </div>}
-      </div>
       <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingBottom:32}}>
         {onCancel&&<button style={sf.btn("ghost")} onClick={onCancel}>{t.annuler}</button>}
         <button style={{...sf.btn("primary"),padding:"12px 32px",fontSize:14}} onClick={handleSave}>💾 {editing?t.enregistrer_modif:t.creer_dossier}</button>
@@ -631,7 +332,6 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
   const modifiees=dossiers.filter(d=>d.statutFacture==="modifiee");
   return (
     <div>
-      {role==="chef"&&<AssistantIA clients={clients} tarifs={tarifs} t={t} onDossierCree={(prefill)=>{onModifier({...prefill,id:Date.now(),dateCreation:new Date().toISOString().slice(0,10),statut:"ouvert",statutFacture:null,lignesSnap:null,tvaClient:clients.find(c=>c.nom===prefill.client)?.tva??true});}}/>}
       {role==="comptable"&&enAttente.length>0&&<div style={{background:"#fef3c7",border:"2px solid #f59e0b",borderRadius:12,padding:"14px 18px",marginBottom:10,fontFamily:"sans-serif"}}>
         <div style={{fontWeight:700,color:"#92400e",fontSize:14,marginBottom:8}}>⏳ {enAttente.length} {t.en_attente_validation}</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{enAttente.map(d=><button key={d.id} onClick={()=>onVoirFacture(d)} style={sf.btn("warning",{fontSize:12,padding:"5px 12px"})}>{d.client}{d.invoiceRef?" #"+d.invoiceRef:""}</button>)}</div>
@@ -713,17 +413,10 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
                 <button style={sf.btn("primary",{padding:"6px 14px",fontSize:12})} onClick={()=>onVoirFacture(d)}>{t.voir_facture}</button>
               </div>
             </div>
-            <div style={{borderTop:"1px solid "+C.border,background:C.offWhite}}>
-              <div style={{padding:"8px 18px",display:"flex",gap:6,flexWrap:"wrap"}}>
-                {d.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(
-                  <span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {m.date}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>
-                ))}
-              </div>
-              {(d.photos?.length>0||d.imageDoc)&&<div style={{padding:"6px 18px 10px",display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{fontSize:10,color:C.grayText,fontFamily:"sans-serif",fontWeight:600}}>📎</span>
-                {d.imageDoc&&<img src={d.imageDoc} alt="doc" style={{height:40,width:56,objectFit:"cover",borderRadius:4,border:"1px solid "+C.border}}/>}
-                {(d.photos||[]).map((p,i)=><img key={i} src={p.data} alt={p.name} style={{height:40,width:56,objectFit:"cover",borderRadius:4,border:"1px solid "+C.border}}/>)}
-              </div>}
+            <div style={{padding:"8px 18px",display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid "+C.border,background:C.offWhite}}>
+              {d.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(
+                <span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {m.date}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>
+              ))}
             </div>
           </div>;
         })}
@@ -1003,8 +696,8 @@ export default function DepotManager() {
     async function charger(){
       const {data:d}=await supabase.from("dossiers").select("*");
       const {data:c}=await supabase.from("clients").select("*");
-      if(d) setDossiers(d.map(x=>({...x,dateCreation:x.date_creation,invoiceRef:x.invoice_ref,fraisSupp:x.frais_supp||[],lignesSnap:x.lignes_snap||null,tvaClient:x.tva_client,statutFacture:x.statut_facture||null,photos:x.photos||[],imageDoc:x.image_doc||null})));
-      if(c&&c.length>0) setClients(c);
+      if(d) setDossiers(d.map(x=>({...x,dateCreation:x.date_creation,invoiceRef:x.invoice_ref,fraisSupp:x.frais_supp||[],lignesSnap:x.lignes_snap||null,tvaClient:x.tva_client,statutFacture:x.statut_facture||null})));
+      if(c&&c.length>0) setClients(c.map(x=>({...x,numero:x.numero||""})));
       setChargement(false);
     }
     charger();
@@ -1016,8 +709,7 @@ export default function DepotManager() {
       palettisation:d.palettisation,depotage:d.depotage,statut:d.statut,
       date_creation:d.dateCreation,mouvements:d.mouvements,
       frais_supp:d.fraisSupp||[],lignes_snap:d.lignesSnap||null,
-      tva_client:d.tvaClient,statut_facture:d.statutFacture||null,
-      photos:d.photos||[],image_doc:d.imageDoc||null
+      tva_client:d.tvaClient,statut_facture:d.statutFacture||null
     });
     setDossiers(ds=>{const idx=ds.findIndex(x=>x.id===d.id);if(idx>=0){const n=[...ds];n[idx]=d;return n;}return [d,...ds];});
     setEditingDossier(null); setTab("dossiers");
@@ -1033,7 +725,7 @@ export default function DepotManager() {
 
   if(chargement) return (
     <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:C.navy,flexDirection:"column",gap:16}}>
-      <img src={DFDS_LOGO} alt="DFDS" style={{height:48,objectFit:"contain"}}/>
+      <img src={DFDS_LOGO} alt="DFDS" style={{height:48,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
       <div style={{fontFamily:"sans-serif",color:"rgba(255,255,255,0.5)",fontSize:14,letterSpacing:"0.05em"}}>Chargement…</div>
     </div>
   );
@@ -1042,7 +734,7 @@ export default function DepotManager() {
     <div style={{minHeight:"100vh",background:C.offWhite,color:C.navy}}>
       <header style={{background:C.navy,color:"#fff",padding:"0 20px",display:"flex",alignItems:"center",justifyContent:"space-between",height:58,position:"sticky",top:0,zIndex:100,boxShadow:"0 2px 16px rgba(12,35,64,0.3)"}}>
         <div style={{display:"flex",alignItems:"center",gap:14}}>
-          <img src={DFDS_LOGO} alt="DFDS" style={{height:28,objectFit:"contain"}}/>
+          <img src={DFDS_LOGO} alt="DFDS" style={{height:28,objectFit:"contain",filter:"brightness(0) invert(1)"}}/>
           <div style={{width:"1px",height:26,background:"rgba(255,255,255,0.2)"}}/>
           <div>
             <div style={{fontSize:12,fontWeight:700,letterSpacing:"0.08em",color:"#fff",textTransform:"uppercase",fontFamily:"sans-serif"}}>Depot Manager</div>
