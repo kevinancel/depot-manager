@@ -217,7 +217,7 @@ function AssistantIA({clients, tarifs, onDossierCree, t}) {
     setLoading(true);
     try {
       const clientsListe = clients.map(c => c.nom).join(", ");
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -249,7 +249,7 @@ Si une info est manquante, mets null. type est "entree" ou "sortie".`,
       reader.onload = async (e) => {
         const b64 = e.target.result.split(",")[1];
         const mediaType = file.type || "image/jpeg";
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
+        const res = await fetch("/api/claude", {
           method: "POST",
           headers: {"Content-Type":"application/json"},
           body: JSON.stringify({
