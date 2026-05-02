@@ -241,7 +241,7 @@ Si une info est manquante, mets null. type est "entree" ou "sortie".`,
   };
 
   // ── Scan document ──
-  const compressImage = (file, maxWidth=1200, quality=0.7) => new Promise((resolve) => {
+  const compressImage = (file, maxWidth=1800, quality=0.85) => new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -302,17 +302,27 @@ Réponds UNIQUEMENT en JSON valide, sans texte autour:
   };
 
   const creerDepuisAnalyse = (data) => {
-    const clientObj = clients.find(c => c.nom === data.client) || clients[0];
+    // Cherche le client dans la liste, sinon prend le premier
+    const clientObj = clients.find(c =>
+      data.client && c.nom.toLowerCase().includes(data.client.toLowerCase())
+    ) || clients.find(c =>
+      data.client && data.client.toLowerCase().includes(c.nom.toLowerCase())
+    ) || clients[0];
+
     const mvt = {
-      type: data.type || "entree",
+      type: "entree",
       date: data.dateDoc || new Date().toISOString().slice(0,10),
-      palettes: data.palettes || 1,
+      palettes: parseInt(data.palettes) || 1,
       provenance: data.provenance || "",
       transporteur: data.transporteur || "",
       poids: data.poids ? String(data.poids) : "",
       id: Date.now()
     };
-    const notes = data.destinataire ? "Destinataire: "+data.destinataire : "";
+
+    const notes = [
+      data.destinataire ? "Destinataire: "+data.destinataire : "",
+    ].filter(Boolean).join(" | ");
+
     onDossierCree({
       client: clientObj?.nom || clients[0]?.nom,
       invoiceRef: "",
