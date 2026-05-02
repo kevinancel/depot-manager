@@ -241,39 +241,52 @@ Si une info est manquante, mets null. type est "entree" ou "sortie".`,
   };
 
   // ── Scan document ──
+  const compressImage = (file, maxWidth=1200, quality=0.7) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ratio = Math.min(maxWidth/img.width, maxWidth/img.height, 1);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
   const scanDocument = async (file) => {
     if (!file) return;
     setScanning(true); setScanResult(null);
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const b64 = e.target.result.split(",")[1];
-        const mediaType = file.type || "image/jpeg";
-        const res = await fetch("/api/claude", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 600,
-            system: `Tu es un assistant logistique spécialisé dans les lettres de voiture et BL.
+      const compressed = await compressImage(file);
+      const b64 = compressed.split(",")[1];
+      const res = await fetch("/api/claude", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 600,
+          system: `Tu es un assistant logistique spécialisé dans les lettres de voiture et BL.
 Clients connus: ${clients.map(c=>c.nom).join(", ")}
 Extrais les informations du document et réponds UNIQUEMENT en JSON valide:
 {"client":null,"palettes":null,"type":"entree","transporteur":null,"poids":null,"provenance":null,"invoiceRef":null,"dateDoc":null}
 Si une info est absente mets null.`,
-            messages: [{role:"user", content:[
-              {type:"image", source:{type:"base64", media_type:mediaType, data:b64}},
-              {type:"text", text:"Extrais les informations logistiques de ce document."}
-            ]}]
-          })
-        });
-        const data = await res.json();
-        const txt = data.content?.[0]?.text || "{}";
-        const clean = txt.replace(/```json|```/g,"").trim();
-        const parsed = JSON.parse(clean);
-        setScanResult({...parsed, imageB64: e.target.result, fileName: file.name});
-        setScanning(false);
-      };
-      reader.readAsDataURL(file);
+          messages: [{role:"user", content:[
+            {type:"image", source:{type:"base64", media_type:"image/jpeg", data:b64}},
+            {type:"text", text:"Extrais les informations logistiques de ce document."}
+          ]}]
+        })
+      });
+      const data = await res.json();
+      const txt = data.content?.[0]?.text || "{}";
+      const clean = txt.replace(/```json|```/g,"").trim();
+      const parsed = JSON.parse(clean);
+      setScanResult({...parsed, imageB64: compressed, fileName: file.name});
+      setScanning(false);
     } catch(e) { console.error(e); setScanning(false); }
   };
 
