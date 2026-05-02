@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-
-const ANTHROPIC_KEY = "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"
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -219,7 +217,7 @@ function AssistantIA({clients, tarifs, onDossierCree, t}) {
     setLoading(true);
     try {
       const clientsListe = clients.map(c => c.nom).join(", ");
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -266,7 +264,7 @@ Si une info est manquante, mets null. type est "entree" ou "sortie".`,
     try {
       const compressed = await compressImage(file);
       const b64 = compressed.split(",")[1];
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/claude", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
