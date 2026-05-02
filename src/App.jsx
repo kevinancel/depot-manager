@@ -270,11 +270,22 @@ Si une info est manquante, mets null. type est "entree" ou "sortie".`,
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 600,
-          system: `Tu es un assistant logistique spécialisé dans les lettres de voiture et BL.
-Clients connus: ${clients.map(c=>c.nom).join(", ")}
-Extrais les informations du document et réponds UNIQUEMENT en JSON valide:
-{"client":null,"palettes":null,"type":"entree","transporteur":null,"poids":null,"provenance":null,"invoiceRef":null,"dateDoc":null}
-Si une info est absente mets null.`,
+          system: `Tu es un expert en documents logistiques (CMR, lettres de voiture, BL) multilingues (français, anglais, turc).
+Le document est reçu au dépôt DFDS à Sète, France.
+
+RÈGLES IMPORTANTES:
+- "type" est TOUJOURS "entree" (on reçoit la marchandise au dépôt)
+- "client" = la société de transport/commissionnaire qui nous mandate, visible dans la case "Transporteur" ou "Carrier" ou logo transporteur (case 16 du CMR). Cherche parmi les clients connus: ${clients.map(c=>c.nom).join(", ")}
+- "provenance" = l'EXPÉDITEUR de la marchandise (case 1, "Sender", "Expéditeur", "Gönderici") — nom société + ville
+- "destinataire" = le DESTINATAIRE final (case 2, "Consignee", "Destinataire", "Alıcı") — nom société + ville
+- "transporteur" = numéro de plaque du camion uniquement (format XX-XXX-XX ou XX XXX XXX, cherche "plaque", "plate", "plaka", "Çekici/Araç plaka")
+- "poids" = poids en kg (nombre uniquement, cherche "kg", "gross weight", "poids brut")
+- "palettes" = nombre de palettes (nombre entier, cherche "PALET", "palette", "pallet", "packages")
+- "invoiceRef" = laisser NULL (sera rempli manuellement plus tard)
+- "dateDoc" = date du document (format YYYY-MM-DD)
+
+Réponds UNIQUEMENT en JSON valide, sans texte autour:
+{"client":null,"palettes":null,"type":"entree","transporteur":null,"poids":null,"provenance":null,"destinataire":null,"invoiceRef":null,"dateDoc":null}`,
           messages: [{role:"user", content:[
             {type:"image", source:{type:"base64", media_type:"image/jpeg", data:b64}},
             {type:"text", text:"Extrais les informations logistiques de ce document."}
@@ -301,10 +312,11 @@ Si une info est absente mets null.`,
       poids: data.poids ? String(data.poids) : "",
       id: Date.now()
     };
+    const notes = data.destinataire ? "Destinataire: "+data.destinataire : "";
     onDossierCree({
       client: clientObj?.nom || clients[0]?.nom,
-      invoiceRef: data.invoiceRef || "",
-      notes: "",
+      invoiceRef: "",
+      notes: notes,
       palettisation: 0,
       depotage: 0,
       mouvements: [mvt],
@@ -376,9 +388,11 @@ Si une info est absente mets null.`,
                   {label:"Client",val:scanResult.client},
                   {label:"Palettes",val:scanResult.palettes},
                   {label:"Type",val:scanResult.type==="entree"?"↓ Entrée":"↑ Sortie"},
-                  {label:"Référence",val:scanResult.invoiceRef},
-                  {label:"Transporteur",val:scanResult.transporteur},
+                  {label:"Destinataire",val:scanResult.destinataire},
+                  {label:"Transporteur/Plaque",val:scanResult.transporteur},
                   {label:"Provenance",val:scanResult.provenance},
+                  {label:"Poids",val:scanResult.poids?scanResult.poids+" kg":null},
+                  {label:"Date doc",val:scanResult.dateDoc},
                 ].filter(x=>x.val).map(x=>(
                   <div key={x.label} style={{background:"#fff",borderRadius:8,padding:"7px 10px",fontFamily:"sans-serif"}}>
                     <div style={{fontSize:10,color:"#6b7280",fontWeight:700,textTransform:"uppercase"}}>{x.label}</div>
