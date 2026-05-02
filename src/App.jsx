@@ -217,7 +217,7 @@ function AssistantIA({clients, tarifs, onDossierCree, t}) {
     setLoading(true);
     try {
       const clientsListe = clients.map(c => c.nom).join(", ");
-      const res = await fetch("/api/claude", {
+      const res = await fetch("https://dfds-proxy.kevinancel.workers.dev", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
@@ -264,7 +264,7 @@ Si une info est manquante, mets null. type est "entree" ou "sortie".`,
     try {
       const compressed = await compressImage(file);
       const b64 = compressed.split(",")[1];
-      const res = await fetch("/api/claude", {
+      const res = await fetch("https://dfds-proxy.kevinancel.workers.dev", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({
