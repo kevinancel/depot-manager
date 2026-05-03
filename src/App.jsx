@@ -143,6 +143,12 @@ function genFacture(dossier, tarifs) {
   return {lignes,ht:total};
 }
 
+async function deleteDossier(id, setDossiers) {
+  if (!window.confirm("Supprimer ce dossier ? Cette action est irréversible.")) return;
+  await supabase.from("dossiers").delete().eq("id", id);
+  setDossiers(ds => ds.filter(x => x.id !== id));
+}
+
 async function updateSF(id,statut,setDossiers) {
   await supabase.from("dossiers").update({statut_facture:statut}).eq("id",id);
   setDossiers(ds=>ds.map(x=>x.id===id?{...x,statutFacture:statut}:x));
@@ -341,16 +347,42 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
   const now=new Date();
   const [moisActif,setMoisActif]=useState(now.getMonth());
   const [anneeActive,setAnneeActive]=useState(now.getFullYear());
+  const [recherche,setRecherche]=useState("");
   const moisNoms=MOIS[lang]||MOIS.fr;
   const moisDispos=[...new Set(dossiers.map(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return annee+"-"+String(mois).padStart(2,"0")}))].sort().reverse();
   const moisActuelKey=now.getFullYear()+"-"+String(now.getMonth()).padStart(2,"0");
   if(!moisDispos.includes(moisActuelKey)) moisDispos.unshift(moisActuelKey);
-  const dossiersDuMois=dossiers.filter(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return mois===moisActif&&annee===anneeActive;});
+  const dossiersFiltresRecherche = recherche.trim()
+    ? dossiers.filter(d => {
+        const q = recherche.toLowerCase();
+        return (
+          d.client?.toLowerCase().includes(q) ||
+          d.invoiceRef?.toLowerCase().includes(q) ||
+          d.notes?.toLowerCase().includes(q) ||
+          d.mouvements?.some(m => m.transporteur?.toLowerCase().includes(q) || m.provenance?.toLowerCase().includes(q))
+        );
+      })
+    : null;
+  const dossiersDuMois = dossiersFiltresRecherche || dossiers.filter(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return mois===moisActif&&annee===anneeActive;});
   const caEstime=dossiersDuMois.reduce((s,d)=>s+genFacture(d,tarifs).ht,0);
   const enAttente=dossiers.filter(d=>d.statutFacture==="en_attente");
   const modifiees=dossiers.filter(d=>d.statutFacture==="modifiee");
   return (
     <div>
+      {/* BARRE DE RECHERCHE */}
+      <div style={{...sf.card,padding:"12px 16px",marginBottom:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:16}}>🔍</span>
+          <input
+            style={{...sf.inp,flex:1,padding:"8px 12px",fontSize:13}}
+            placeholder="Rechercher par client, référence, plaque, notes..."
+            value={recherche}
+            onChange={e=>setRecherche(e.target.value)}
+          />
+          {recherche&&<button onClick={()=>setRecherche("")} style={{background:"none",border:"none",color:C.grayText,cursor:"pointer",fontSize:18,padding:"0 4px"}}>✕</button>}
+        </div>
+      </div>
+
       {role==="comptable"&&enAttente.length>0&&<div style={{background:"#fef3c7",border:"2px solid #f59e0b",borderRadius:12,padding:"14px 18px",marginBottom:10,fontFamily:"sans-serif"}}>
         <div style={{fontWeight:700,color:"#92400e",fontSize:14,marginBottom:8}}>⏳ {enAttente.length} {t.en_attente_validation}</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{enAttente.map(d=><button key={d.id} onClick={()=>onVoirFacture(d)} style={sf.btn("warning",{fontSize:12,padding:"5px 12px"})}>{d.client}{d.invoiceRef?" #"+d.invoiceRef:""}</button>)}</div>
@@ -361,7 +393,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
       </div>}
       {role==="chef"&&modifiees.length>0&&<div style={{background:"#fee2e2",border:"2px solid "+C.danger,borderRadius:12,padding:"12px 18px",marginBottom:10,fontFamily:"sans-serif",fontSize:13,fontWeight:600,color:C.danger}}>⚠️ {modifiees.length} {t.modifiees_apres}</div>}
 
-      <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:16,flexWrap:"wrap"}}>
+      {!recherche&&<div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:16,flexWrap:"wrap"}}>
         {moisDispos.map(key=>{
           const [a,m]=key.split("-");const annee=parseInt(a);const mois=parseInt(m);
           const actif=mois===moisActif&&annee===anneeActive;
@@ -370,7 +402,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
             {moisNoms[mois]} {annee}{nb>0&&<span style={{marginLeft:6,background:actif?C.accent:C.grayMid,color:actif?C.navy:"#fff",borderRadius:10,padding:"1px 7px",fontSize:10,fontWeight:700}}>{nb}</span>}
           </button>;
         })}
-      </div>
+      </div>}
 
       <div style={{...sf.card,padding:0,marginBottom:16}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)"}}>
@@ -386,7 +418,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
       <div style={sf.card}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
           <div style={sf.sec}>{t.tous_dossiers} — {moisNoms[moisActif]} {anneeActive}</div>
-          {caEstime>0&&<div style={{fontFamily:"sans-serif",fontSize:13,color:C.grayText}}>HT : <strong style={{color:C.accent}}>{caEstime.toFixed(2)} €</strong></div>}
+          {recherche?<div style={{fontFamily:"sans-serif",fontSize:13,color:C.grayText}}><strong>{dossiersDuMois.length}</strong> résultat(s) pour <strong>"{recherche}"</strong></div>:caEstime>0&&<div style={{fontFamily:"sans-serif",fontSize:13,color:C.grayText}}>HT : <strong style={{color:C.accent}}>{caEstime.toFixed(2)} €</strong></div>}
         </div>
         {dossiersDuMois.length===0&&<div style={{textAlign:"center",padding:"56px 0",color:C.grayText,fontFamily:"sans-serif"}}>
           <div style={{fontSize:48,marginBottom:12}}>📦</div>
@@ -423,6 +455,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
                   <div style={{fontWeight:800,fontSize:16,color:C.navy}}>{ht.toFixed(2)} € HT</div>
                 </div>
                 {role==="chef"&&!estV&&sf2!=="en_attente"&&<button style={sf.btn("ghost",{padding:"6px 10px",fontSize:13})} onClick={()=>onModifier(d)}>✏️</button>}
+                {role==="chef"&&!estV&&<button style={sf.btn("danger",{padding:"6px 10px",fontSize:12})} onClick={()=>deleteDossier(d.id,setDossiers)}>🗑️</button>}
                 {role==="chef"&&!sf2&&<button style={sf.btn("primary",{padding:"6px 12px",fontSize:12})} onClick={()=>updateSF(d.id,"en_attente",setDossiers)}>📤 {t.envoyer_compta}</button>}
                 {role==="chef"&&sf2==="en_attente"&&<span style={{fontFamily:"sans-serif",fontSize:12,color:"#d97706",fontWeight:600}}>⏳ {t.en_attente}</span>}
                 {role==="chef"&&estV&&<button style={sf.btn("danger",{padding:"6px 10px",fontSize:12})} onClick={()=>{if(window.confirm(t.confirm_deverrouiller))onModifier(d);}}>🔓 {t.deverrouiller}</button>}
@@ -447,6 +480,144 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
   );
 }
 
+
+// ─── GÉNÉRATION PDF PRO ─────────────────────────────────────────────────────
+function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
+  const clientObj = clients.find(c => c.nom === dossier.client) || {};
+  const num = dossier.invoiceRef || ("DOS-" + dossier.id.toString().slice(-5));
+  const dateDoc = new Date().toLocaleDateString("fr-FR");
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Facture ${num}</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Arial', sans-serif; font-size: 13px; color: #1a1a2e; background: #fff; padding: 40px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 3px solid #E8A020; }
+  .logo-area h1 { font-size: 22px; font-weight: 900; color: #0C2340; letter-spacing: 0.05em; }
+  .logo-area p { color: #64748b; font-size: 12px; margin-top: 4px; }
+  .invoice-info { text-align: right; }
+  .invoice-num { font-size: 24px; font-weight: 900; color: #E8A020; }
+  .invoice-date { color: #64748b; font-size: 12px; margin-top: 4px; }
+  .parties { display: flex; gap: 40px; margin-bottom: 32px; }
+  .party { flex: 1; }
+  .party-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; margin-bottom: 8px; }
+  .party-name { font-size: 16px; font-weight: 800; color: #0C2340; }
+  .party-sub { color: #64748b; font-size: 12px; margin-top: 2px; }
+  .mvt-section { margin-bottom: 24px; }
+  .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; margin-bottom: 10px; }
+  .mvt-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mvt-tag { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .entree { background: #dbeafe; color: #1d4ed8; }
+  .sortie { background: #fce7f3; color: #be185d; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  thead tr { background: #0C2340; color: #fff; }
+  thead th { padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+  thead th.right { text-align: right; }
+  tbody tr { border-bottom: 1px solid #e2e8f0; }
+  tbody tr:nth-child(even) { background: #f8f9fc; }
+  tbody td { padding: 10px 14px; }
+  tbody td.right { text-align: right; font-weight: 700; }
+  .totals { display: flex; justify-content: flex-end; margin-bottom: 32px; }
+  .totals-box { width: 280px; }
+  .total-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; color: #64748b; font-size: 14px; }
+  .total-final { display: flex; justify-content: space-between; padding: 14px 0; font-weight: 900; font-size: 20px; color: #0C2340; }
+  .total-final span:last-child { color: #E8A020; }
+  .ht-only { background: #fef9c3; color: #92400e; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+  .notes { background: #fef8ec; border-left: 4px solid #E8A020; padding: 12px 16px; border-radius: 4px; font-size: 13px; margin-bottom: 32px; }
+  .footer { text-align: center; padding-top: 24px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 11px; }
+  @media print { body { padding: 20px; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-area">
+      <h1>DFDS</h1>
+      <p>Dépôt Hors DFDS · Zone Portuaire · 34200 Sète</p>
+      <p>Tél : +33 (0)4 67 48 XX XX · depot@dfds.com</p>
+    </div>
+    <div class="invoice-info">
+      <div class="invoice-num">${num}</div>
+      <div class="invoice-date">Date : ${dateDoc}</div>
+      <div class="invoice-date" style="margin-top:4px;font-weight:700;color:#0C2340">${dossier.statut === "ouvert" ? "EN COURS" : "CLÔTURÉ"}</div>
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="party">
+      <div class="party-label">Émetteur</div>
+      <div class="party-name">DFDS Logistics France SARL</div>
+      <div class="party-sub">Route de Pontmartin · Zone Portuaire</div>
+      <div class="party-sub">34200 Sète, France</div>
+    </div>
+    <div class="party">
+      <div class="party-label">Client</div>
+      <div class="party-name">${dossier.client}${clientObj.numero ? " · N°" + clientObj.numero : ""}</div>
+      <div class="party-sub">${avecTVA ? "Facturation TTC (TVA 20%)" : "Facturation HT — Client exonéré de TVA"}</div>
+    </div>
+  </div>
+
+  <div class="mvt-section">
+    <div class="section-title">Mouvements de palettes</div>
+    <div class="mvt-tags">
+      ${dossier.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m =>
+        `<span class="mvt-tag ${m.type}">${m.type==="entree"?"↓":"↑"} ${m.palettes} pal.${m.poids?" · "+m.poids+"kg":""} · ${m.date}${m.transporteur?" · 🚛"+m.transporteur:""}${m.provenance?" · "+m.provenance:""}</span>`
+      ).join("")}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Désignation</th>
+        <th class="right">Qté</th>
+        <th class="right">PU HT</th>
+        <th class="right">Total HT</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${lignes.map(l => `
+        <tr>
+          <td>${l.desc}</td>
+          <td class="right">${l.qty}</td>
+          <td class="right">${(l.pu||0).toFixed(2)} €</td>
+          <td class="right">${l.total.toFixed(2)} €</td>
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-box">
+      <div class="total-row"><span>Total HT</span><span>${ht.toFixed(2)} €</span></div>
+      ${avecTVA
+        ? `<div class="total-row"><span>TVA 20%</span><span>${tva.toFixed(2)} €</span></div>`
+        : `<div class="ht-only">⚠️ Client exonéré de TVA — Facturation HT uniquement</div>`
+      }
+      <div class="total-final">
+        <span>${avecTVA ? "TOTAL TTC" : "TOTAL HT"}</span>
+        <span>${ttc.toFixed(2)} €</span>
+      </div>
+    </div>
+  </div>
+
+  ${dossier.notes ? `<div class="notes">📝 ${dossier.notes}</div>` : ""}
+
+  <div class="footer">
+    DFDS Logistics France SARL · SIRET : XXX XXX XXX XXXXX · TVA : FR XX XXX XXX XXX<br>
+    Document généré le ${dateDoc} · Dépôt Manager v2.0
+  </div>
+</body>
+</html>`;
+
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => w.print(), 500);
+}
+
 // ─── PAGE FACTURE ─────────────────────────────────────────────────────────────
 function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
   const clientObj=clients.find(c=>c.nom===dossier.client)||{tva:true};
@@ -463,7 +634,7 @@ function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
           {role==="comptable"&&sf2==="en_attente"&&<button style={sf.btn("success")} onClick={()=>updateSF(dossier.id,"validee",setDossiers)}>✅ {t.marquer_facture}</button>}
           {role==="comptable"&&sf2==="modifiee"&&<button style={sf.btn("success")} onClick={()=>updateSF(dossier.id,"validee",setDossiers)}>✅ {t.revalider_facture}</button>}
           {role==="comptable"&&sf2==="validee"&&<button style={sf.btn("ghost",{fontSize:12})} onClick={()=>updateSF(dossier.id,null,setDossiers)}>🔓 {t.devalider}</button>}
-          <button style={sf.btn("accent")} onClick={()=>window.print()}>🖨️ {t.imprimer}</button>
+          <button style={sf.btn("accent")} onClick={()=>genererPDF(dossier,clients,lignes,ht,tva,ttc,avecTVA,t)}>📄 {t.imprimer}</button>
         </div>
       </div>
       <div style={sf.card}>
