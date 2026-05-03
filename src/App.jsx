@@ -809,7 +809,7 @@ export default function DepotManager() {
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className="main-content" style={{flex:1,marginLeft:220,padding:"20px",minHeight:"calc(100vh - 52px)",width:"calc(100% - 220px)",maxWidth:"calc(100% - 220px)"}}>
+        <main className="main-content" style={{flex:1,marginLeft:220,padding:"20px",minHeight:"calc(100vh - 52px)",width:"100%"}}>
           {tab==="dossiers"&&<PageDossiers dossiers={dossiers} clients={clients} tarifs={tarifs} role={role} lang={lang} t={t} onVoirFacture={d=>{setFactureOuverte(d);setTab("facture");}} setDossiers={setDossiers} onModifier={handleModifier}/>}
           {tab==="nouveau"&&role==="chef"&&<FormDossier clients={clients} tarifs={tarifs} onSave={saveDossier} t={t}/>}
           {tab==="modifier"&&editingDossier&&<FormDossier clients={clients} tarifs={tarifs} dossierInitial={editingDossier} onSave={saveDossier} onCancel={()=>setTab("dossiers")} t={t}/>}
