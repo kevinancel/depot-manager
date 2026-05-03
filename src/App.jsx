@@ -296,7 +296,7 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
       <div style={sf.card}>
         <div style={sf.sec}>{t.frais_supp}</div>
         <div style={{background:C.offWhite,border:"1.5px solid "+C.border,borderRadius:10,padding:16,marginBottom:14}}>
-          <div style={{display:"grid",gridTemplateColumns:"2fr 140px 1fr 1fr auto",gap:12,alignItems:"end"}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:12,alignItems:"end"}}>
             <div><label style={sf.lbl}>{t.description}</label><input style={sf.inp} placeholder="ex: Manutention spéciale" value={frais.desc} onChange={e=>setFrais(f=>({...f,desc:e.target.value}))}/></div>
             <div><label style={sf.lbl}>Type</label><select style={sf.sel} value={frais.type} onChange={e=>setFrais(f=>({...f,type:e.target.value}))}><option value="libre">{t.montant_libre}</option><option value="qpu">{t.qte_pu}</option></select></div>
             {frais.type==="libre"?<div style={{gridColumn:"span 2"}}><label style={sf.lbl}>{t.montant_ht}</label><input style={sf.inp} type="number" min={0} step="0.01" value={frais.montant} onChange={e=>setFrais(f=>({...f,montant:+e.target.value}))}/></div>
@@ -373,7 +373,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
       </div>
 
       <div style={{...sf.card,padding:0,marginBottom:16}}>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)"}}>
           {[{val:dossiersDuMois.length,label:t.dossiers_nb,color:C.navy},{val:dossiersDuMois.filter(d=>d.statut==="ouvert").length,label:t.en_cours,color:"#d97706"},{val:dossiersDuMois.filter(d=>d.statut==="ouvert").reduce((s,d)=>{const e=d.mouvements.filter(m=>m.type==="entree").reduce((a,m)=>a+m.palettes,0);const so=d.mouvements.filter(m=>m.type==="sortie").reduce((a,m)=>a+m.palettes,0);return s+e-so;},0),label:t.palettes_stock,color:"#2563eb"},{val:caEstime.toFixed(0)+" €",label:t.ca_ht_mois,color:C.accent}].map((k,i)=>(
             <div key={i} style={{textAlign:"center",padding:"20px 12px",borderRight:i<3?"1px solid "+C.border:"none"}}>
               <div style={{fontSize:28,fontWeight:800,color:k.color,fontFamily:"sans-serif"}}>{k.val}</div>
@@ -485,7 +485,7 @@ function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
         </div>
         <div style={sf.sec}>{t.designation}</div>
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:13,marginBottom:24,minWidth:400}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:13,marginBottom:24}}>
             <thead><tr style={{background:C.offWhite}}>{[t.designation,t.qte,"PU HT",t.total_ht].map((h,i)=><th key={i} style={{padding:"10px 14px",textAlign:i===0?"left":"right",fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",color:C.grayText,borderBottom:"2px solid "+C.border,fontWeight:700}}>{h}</th>)}</tr></thead>
             <tbody>{lignes.map((l,i)=><tr key={i} style={{borderBottom:"1px solid "+C.border,background:i%2===0?C.white:C.offWhite}}><td style={{padding:"10px 14px",color:C.navy}}>{l.desc}</td><td style={{padding:"10px 14px",textAlign:"right"}}>{l.qty}</td><td style={{padding:"10px 14px",textAlign:"right"}}>{(l.pu||0).toFixed(2)} €</td><td style={{padding:"10px 14px",textAlign:"right",fontWeight:700,color:C.navy}}>{l.total.toFixed(2)} €</td></tr>)}</tbody>
           </table>
@@ -548,7 +548,7 @@ function PageDashboard({dossiers,clients,tarifs,t,lang}) {
           ))}
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
         <div style={sf.card}>
           <div style={sf.sec}>{t.par_client}</div>
           {topClients.length===0?<div style={{color:C.grayText,fontFamily:"sans-serif",fontSize:13,textAlign:"center",padding:16}}>{t.aucune_donnee}</div>
@@ -557,7 +557,7 @@ function PageDashboard({dossiers,clients,tarifs,t,lang}) {
         <div style={sf.card}>
           <div style={sf.sec}>{t.detail_mensuel}</div>
           <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:12,minWidth:200}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:12}}>
               <thead><tr style={{background:C.offWhite}}>{[t.mois,t.dossiers_nb,"CA HT"].map((h,i)=><th key={i} style={{padding:"8px 10px",textAlign:i===0?"left":"right",fontSize:10,textTransform:"uppercase",color:C.grayText,borderBottom:"2px solid "+C.border,fontWeight:700}}>{h}</th>)}</tr></thead>
               <tbody>{parMois.map((m,i)=>(<tr key={i} style={{borderBottom:"1px solid "+C.border,background:i%2===0?C.white:C.offWhite,opacity:m.nb===0?0.4:1}}><td style={{padding:"7px 10px",fontWeight:m.nb>0?700:400,color:C.navy}}>{m.mois.slice(0,3)}</td><td style={{padding:"7px 10px",textAlign:"right"}}>{m.nb}</td><td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,color:m.ca>0?C.accent:C.grayText}}>{m.ca>0?m.ca.toFixed(0)+" €":"—"}</td></tr>))}</tbody>
               <tfoot><tr style={{background:C.navy,color:"#fff"}}><td style={{padding:"9px 10px",fontWeight:800}}>{t.total}</td><td style={{padding:"9px 10px",textAlign:"right",fontWeight:700}}>{df.length}</td><td style={{padding:"9px 10px",textAlign:"right",fontWeight:800,color:C.accent}}>{caTotal.toFixed(0)} €</td></tr></tfoot>
@@ -642,7 +642,7 @@ function PageClients({clients,setClients,t}) {
     <div>
       <div style={sf.card}>
         <div style={sf.sec}>{t.ajouter_client}</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 130px 170px 120px",gap:12,alignItems:"end"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12,alignItems:"end"}}>
           <div><label style={sf.lbl}>{t.nom}</label><input style={sf.inp} placeholder="ex: LATASTE" value={nc.nom} onChange={e=>{setNc(n=>({...n,nom:e.target.value.toUpperCase()}));setErr("");}}/></div>
           <div><label style={sf.lbl}>{t.numero_client}</label><input style={sf.inp} placeholder="103371" value={nc.numero} onChange={e=>setNc(n=>({...n,numero:e.target.value}))}/></div>
           <div><label style={sf.lbl}>{t.tva} ?</label><select style={sf.sel} value={nc.tva?"oui":"non"} onChange={e=>setNc(n=>({...n,tva:e.target.value==="oui"}))}><option value="oui">✅ Oui — TTC</option><option value="non">⚠️ Non — HT</option></select></div>
@@ -653,7 +653,7 @@ function PageClients({clients,setClients,t}) {
       <div style={sf.card}>
         <div style={sf.sec}>{clients.length} {t.clients}</div>
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:14,minWidth:400}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:13}}>
             <thead><tr style={{background:C.offWhite}}>{[t.numero_client,t.nom,t.tva,t.facturation,t.actions].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:10,textTransform:"uppercase",letterSpacing:"0.06em",color:C.grayText,borderBottom:"2px solid "+C.border,fontWeight:700}}>{h}</th>)}</tr></thead>
             <tbody>{clients.map((c,i)=>{
               const isE=ed&&ed._orig===c.nom;
@@ -681,7 +681,7 @@ function PageTarifs({tarifs,setTarifs,t}) {
       <div style={sf.sec}>{t.grille_tarifaire}</div>
       <div style={{background:"#fef9c3",border:"1.5px solid #f59e0b",borderRadius:8,padding:"10px 14px",marginBottom:16,fontFamily:"sans-serif",fontSize:12,color:"#92400e",fontWeight:600}}>⚠️ {t.tarifs_warning}</div>
       <div style={{overflowX:"auto"}}>
-        <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:14,minWidth:400}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontFamily:"sans-serif",fontSize:13}}>
           <thead><tr style={{background:C.offWhite}}>{[t.grille_tarifaire,t.prix_ht,t.unite,t.action].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",fontSize:10,textTransform:"uppercase",color:C.grayText,borderBottom:"2px solid "+C.border,fontWeight:700}}>{h}</th>)}</tr></thead>
           <tbody>{tarifs.map((x,i)=>{const isE=editId===x.id;return <tr key={x.id} style={{borderBottom:"1px solid "+C.border,background:i%2===0?C.white:C.offWhite}}>
             <td style={{padding:"10px 14px",fontWeight:600,color:C.navy}}>{x.label||x.labelFr}</td>
@@ -754,48 +754,62 @@ export default function DepotManager() {
 
   return (
     <div style={{minHeight:"100vh",background:C.offWhite,color:C.navy}}>
+      <style>{`
+        * { box-sizing: border-box; }
+        .sidebar { display: flex; }
+        .main-content { margin-left: 220px; }
+        .mobile-nav { display: none; }
+        .hide-mobile { display: block; }
+        @media (max-width: 768px) {
+          .sidebar { display: none !important; }
+          .main-content { margin-left: 0 !important; padding: 12px !important; padding-bottom: 80px !important; }
+          .mobile-nav { display: flex !important; }
+          .hide-mobile { display: none !important; }
+          .header-role { display: none; }
+          .lang-btn span { font-size: 9px !important; padding: 2px 5px !important; }
+          .logout-btn { font-size: 10px !important; padding: 3px 6px !important; }
+        }
+      `}</style>
 
-      {/* ── HEADER MOBILE ── */}
-      <header style={{background:C.navy,color:"#fff",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:54,position:"fixed",top:0,left:0,right:0,zIndex:200,boxShadow:"0 2px 16px rgba(12,35,64,0.3)"}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <img src={DFDS_LOGO} alt="DFDS" style={{height:26,objectFit:"contain"}}/>
-          <div style={{width:"1px",height:22,background:"rgba(255,255,255,0.2)"}}/>
-          <div>
-            <div style={{fontSize:12,fontWeight:700,letterSpacing:"0.06em",color:"#fff",textTransform:"uppercase",fontFamily:"sans-serif"}}>Depot Manager</div>
-            <div style={{fontSize:9,color:C.accent,letterSpacing:"0.1em",textTransform:"uppercase",fontFamily:"sans-serif",fontWeight:600}}>{role==="chef"?t.chef_quai:t.comptable}</div>
+      {/* HEADER */}
+      <header style={{background:C.navy,color:"#fff",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:52,position:"fixed",top:0,left:0,right:0,zIndex:300,boxShadow:"0 2px 16px rgba(12,35,64,0.3)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0,overflow:"hidden"}}>
+          <img src={DFDS_LOGO} alt="DFDS" style={{height:24,objectFit:"contain",flexShrink:0}}/>
+          <div style={{width:1,height:20,background:"rgba(255,255,255,0.2)",flexShrink:0}}/>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#fff",textTransform:"uppercase",fontFamily:"sans-serif",whiteSpace:"nowrap"}}>Depot Manager</div>
+            <div className="header-role" style={{fontSize:8,color:C.accent,textTransform:"uppercase",fontFamily:"sans-serif",fontWeight:600,whiteSpace:"nowrap"}}>{role==="chef"?t.chef_quai:t.comptable}</div>
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:8}}>
-          <div style={{display:"flex",gap:3}}>
-            {["fr","en","tr"].map(l=><button key={l} onClick={()=>changeLang(l)} style={{background:lang===l?C.accent:"rgba(255,255,255,0.1)",border:"none",color:lang===l?C.navy:"rgba(255,255,255,0.7)",cursor:"pointer",padding:"3px 7px",borderRadius:5,fontSize:10,fontWeight:700,fontFamily:"sans-serif"}}>{l.toUpperCase()}</button>)}
+        <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+          <div style={{display:"flex",gap:2}}>
+            {["fr","en","tr"].map(l=><button key={l} onClick={()=>changeLang(l)} style={{background:lang===l?C.accent:"rgba(255,255,255,0.1)",border:"none",color:lang===l?C.navy:"rgba(255,255,255,0.7)",cursor:"pointer",padding:"3px 7px",borderRadius:4,fontSize:10,fontWeight:700,fontFamily:"sans-serif"}}>{l.toUpperCase()}</button>)}
           </div>
-          {role==="comptable"&&nbA>0&&<div style={{background:C.danger,color:"#fff",borderRadius:20,padding:"1px 7px",fontSize:10,fontFamily:"sans-serif",fontWeight:800}}>🔔 {nbA}</div>}
-          <div style={{fontSize:9,color:"#00d97e",fontFamily:"sans-serif",display:"flex",alignItems:"center",gap:3,fontWeight:600}}><div style={{width:5,height:5,borderRadius:"50%",background:"#00d97e"}}/>Cloud</div>
-          <button onClick={handleLogout} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"rgba(255,255,255,0.8)",cursor:"pointer",fontSize:10,padding:"4px 8px",borderRadius:5,fontFamily:"sans-serif",fontWeight:600}}>{t.deconnexion}</button>
+          {role==="comptable"&&nbA>0&&<div style={{background:C.danger,color:"#fff",borderRadius:20,padding:"1px 6px",fontSize:10,fontFamily:"sans-serif",fontWeight:800}}>🔔{nbA}</div>}
+          <div style={{width:6,height:6,borderRadius:"50%",background:"#00d97e",flexShrink:0}}/>
+          <button onClick={handleLogout} style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.2)",color:"#fff",cursor:"pointer",fontSize:10,padding:"4px 8px",borderRadius:4,fontFamily:"sans-serif",fontWeight:600,whiteSpace:"nowrap"}}>{t.deconnexion}</button>
         </div>
       </header>
 
-      {/* ── LAYOUT PRINCIPAL ── */}
-      <div style={{display:"flex",paddingTop:54}}>
+      <div style={{display:"flex",paddingTop:52}}>
 
-        {/* ── SIDEBAR DESKTOP ── */}
-        <aside className="desktop-sidebar" style={{width:220,minHeight:"calc(100vh - 54px)",background:C.navy,position:"fixed",top:54,left:0,bottom:0,zIndex:100,display:"flex",flexDirection:"column",padding:"16px 0",overflowY:"auto"}}>
+        {/* SIDEBAR DESKTOP */}
+        <aside className="sidebar" style={{width:220,height:"calc(100vh - 52px)",background:C.navy,position:"fixed",top:52,left:0,bottom:0,zIndex:200,flexDirection:"column",padding:"12px 0",overflowY:"auto"}}>
           {TABS.map(tb=>{
             const icons={"dossiers":"📁","nouveau":"➕","dashboard":"📊","export":"📄","clients":"👥","tarifs":"💶"};
             const active=tab===tb.id||(tab==="facture"&&tb.id==="dossiers")||(tab==="modifier"&&tb.id==="nouveau");
-            return <button key={tb.id} onClick={()=>setTab(tb.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 20px",border:"none",background:active?"rgba(232,160,32,0.15)":"transparent",color:active?C.accent:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:13,fontFamily:"sans-serif",fontWeight:active?700:400,borderLeft:active?"3px solid "+C.accent:"3px solid transparent",textAlign:"left",transition:"all 0.15s"}}>
-              <span style={{fontSize:16}}>{icons[tb.id]||"•"}</span>
-              {tb.label}
+            return <button key={tb.id} onClick={()=>setTab(tb.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 20px",border:"none",background:active?"rgba(232,160,32,0.15)":"transparent",color:active?C.accent:"rgba(255,255,255,0.55)",cursor:"pointer",fontSize:13,fontFamily:"sans-serif",fontWeight:active?700:400,borderLeft:active?"3px solid "+C.accent:"3px solid transparent",textAlign:"left",width:"100%",transition:"all 0.15s"}}>
+              <span style={{fontSize:15,flexShrink:0}}>{icons[tb.id]}</span>
+              <span>{tb.label}</span>
             </button>;
           })}
-          <div style={{marginTop:"auto",padding:"16px 20px",borderTop:"1px solid rgba(255,255,255,0.1)"}}>
-            <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",fontFamily:"sans-serif",marginBottom:4}}>DFDS · Sète</div>
-            <div style={{fontSize:9,color:"rgba(255,255,255,0.3)",fontFamily:"sans-serif"}}>v2.0 — 2026</div>
+          <div style={{marginTop:"auto",padding:"16px 20px",borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+            <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",fontFamily:"sans-serif"}}>DFDS · Sète · 2026</div>
           </div>
         </aside>
 
-        {/* ── CONTENU PRINCIPAL ── */}
-        <main className="main-content" style={{flex:1,marginLeft:220,padding:"20px 24px",minHeight:"calc(100vh - 54px)",maxWidth:"100%",boxSizing:"border-box"}}>
+        {/* MAIN CONTENT */}
+        <main className="main-content" style={{flex:1,marginLeft:220,padding:"20px",minHeight:"calc(100vh - 52px)",width:"100%"}}>
           {tab==="dossiers"&&<PageDossiers dossiers={dossiers} clients={clients} tarifs={tarifs} role={role} lang={lang} t={t} onVoirFacture={d=>{setFactureOuverte(d);setTab("facture");}} setDossiers={setDossiers} onModifier={handleModifier}/>}
           {tab==="nouveau"&&role==="chef"&&<FormDossier clients={clients} tarifs={tarifs} onSave={saveDossier} t={t}/>}
           {tab==="modifier"&&editingDossier&&<FormDossier clients={clients} tarifs={tarifs} dossierInitial={editingDossier} onSave={saveDossier} onCancel={()=>setTab("dossiers")} t={t}/>}
@@ -807,25 +821,15 @@ export default function DepotManager() {
         </main>
       </div>
 
-      {/* ── BARRE NAVIGATION BAS MOBILE ── */}
-      <style>{`
-        @media (min-width: 768px) {
-          .mobile-nav { display: none !important; }
-          .desktop-sidebar { display: flex !important; }
-        }
-        @media (max-width: 767px) {
-          .desktop-sidebar { display: none !important; }
-          .mobile-nav { display: flex !important; }
-          .main-content { margin-left: 0 !important; padding: 12px !important; padding-bottom: 80px !important; }
-        }
-      `}</style>
-      <nav className="mobile-nav" style={{display:"none",position:"fixed",bottom:0,left:0,right:0,background:C.navy,borderTop:"1px solid rgba(255,255,255,0.1)",zIndex:200,padding:"6px 0 8px"}}>
-        {TABS.slice(0,role==="chef"?5:3).map(tb=>{
+      {/* BARRE MOBILE BAS */}
+      <nav className="mobile-nav" style={{display:"none",position:"fixed",bottom:0,left:0,right:0,background:C.navy,borderTop:"1px solid rgba(255,255,255,0.1)",zIndex:300,paddingBottom:"env(safe-area-inset-bottom)"}}>
+        {TABS.slice(0,role==="chef"?6:3).map(tb=>{
           const icons={"dossiers":"📁","nouveau":"➕","dashboard":"📊","export":"📄","clients":"👥","tarifs":"💶"};
           const active=tab===tb.id||(tab==="facture"&&tb.id==="dossiers")||(tab==="modifier"&&tb.id==="nouveau");
-          return <button key={tb.id} onClick={()=>setTab(tb.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"4px 2px",border:"none",background:"transparent",color:active?C.accent:"rgba(255,255,255,0.5)",cursor:"pointer",fontFamily:"sans-serif",fontSize:9,fontWeight:active?700:400}}>
-            <span style={{fontSize:20}}>{icons[tb.id]}</span>
-            {tb.label.length>8?tb.label.slice(0,8)+"…":tb.label}
+          const shortLabels={"dossiers":"Dossiers","nouveau":"Nouveau","dashboard":"Stats","export":"Export","clients":"Clients","tarifs":"Tarifs"};
+          return <button key={tb.id} onClick={()=>setTab(tb.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:1,padding:"6px 2px 8px",border:"none",background:"transparent",color:active?C.accent:"rgba(255,255,255,0.45)",cursor:"pointer",fontFamily:"sans-serif",fontSize:9,fontWeight:active?700:400}}>
+            <span style={{fontSize:18}}>{icons[tb.id]}</span>
+            <span>{shortLabels[tb.id]}</span>
           </button>;
         })}
       </nav>
