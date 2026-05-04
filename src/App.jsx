@@ -122,7 +122,7 @@ const CLIENTS_INIT = [
 ];
 
 function today() { return new Date().toISOString().slice(0,10); }
-function formatDate(d) { if(!d) return ""; const [y,m,j]=d.split("-"); return j+"/"+m+"/"+y; }
+function fDate(d) { if(!d) return ""; const [y,m,j]=d.split("-"); return j+"/"+m+"/"+y; }
 function daysBetween(a,b) { return Math.max(0,Math.round((new Date(b)-new Date(a))/86400000)); }
 function getMoisAnnee(date) { const d=new Date(date); return {mois:d.getMonth(),annee:d.getFullYear()}; }
 
@@ -282,7 +282,7 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
           :mouvements.map((m,i)=>(
             <div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:8,marginBottom:6,background:m.type==="entree"?"#eff6ff":"#fdf4ff",border:"1px solid "+(m.type==="entree"?"#bfdbfe":"#e9d5ff")}}>
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={sf.tag(m.type)}>{m.type==="entree"?"↓ "+L.entree:"↑"} {m.palettes} pal.</span>
+                <span style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.</span>
                 <span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>{m.date}</span>
                 {m.poids&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>⚖️ {m.poids}kg</span>}
                 {m.transporteur&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>🚛 {m.transporteur}</span>}
@@ -330,21 +330,18 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
               <button onClick={()=>setPhotos(ph=>ph.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,cursor:"pointer",fontSize:13,fontWeight:700}}>✕</button>
             </div>
           ))}
-          <button onClick={()=>photoRef.current?.click()} style={{width:90,height:90,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>
-            <span style={{fontSize:24}}>📷</span>
-            <span>Ajouter</span>
-          </button>
-        </div>
-        <input ref={photoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
-      </div>
-      {photoViewer&&(
-        <div onClick={()=>setPhotoViewer(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.9)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-          <div style={{position:"relative",maxWidth:"100%",maxHeight:"100%"}}>
-            <img src={photoViewer} alt="photo" style={{maxWidth:"90vw",maxHeight:"85vh",objectFit:"contain",borderRadius:8}}/>
-            <button onClick={()=>setPhotoViewer(null)} style={{position:"absolute",top:-12,right:-12,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:16,fontWeight:700}}>✕</button>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <button onClick={()=>photoRef.current?.click()} style={{width:90,height:44,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>🖼️ Galerie</button>
+            <button onClick={()=>cameraRef.current?.click()} style={{width:90,height:44,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>📷 Photo</button>
           </div>
         </div>
-      )}
+        <input ref={photoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
+      </div>
+      {photoViewer&&<div onClick={()=>setPhotoViewer(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.92)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <img src={photoViewer} alt="" style={{maxWidth:"90vw",maxHeight:"88vh",objectFit:"contain",borderRadius:8}}/>
+        <button onClick={()=>setPhotoViewer(null)} style={{position:"absolute",top:16,right:16,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:36,height:36,cursor:"pointer",fontSize:18,fontWeight:700}}>✕</button>
+      </div>}
       <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingBottom:32}}>
         {onCancel&&<button style={sf.btn("ghost")} onClick={onCancel}>{t.annuler}</button>}
         <button style={{...sf.btn("primary"),padding:"12px 32px",fontSize:14}} onClick={handleSave}>💾 {editing?t.enregistrer_modif:t.creer_dossier}</button>
@@ -359,6 +356,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
   const [moisActif,setMoisActif]=useState(now.getMonth());
   const [anneeActive,setAnneeActive]=useState(now.getFullYear());
   const [recherche,setRecherche]=useState("");
+  const [showValidees,setShowValidees]=useState(false);
   const [filtreClient,setFiltreClient]=useState("tous");
   const [filtreStatut,setFiltreStatut]=useState("tous");
   const moisNoms=MOIS[lang]||MOIS.fr;
@@ -369,7 +367,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
     let base = recherche.trim()
       ? dossiers
       : dossiers.filter(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return mois===moisActif&&annee===anneeActive;});
-    if(recherche.trim()) {
+    if(recherche.trim()){
       const q=recherche.toLowerCase();
       base=base.filter(d=>
         d.client?.toLowerCase().includes(q)||
@@ -379,21 +377,31 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
       );
     }
     if(filtreClient!=="tous") base=base.filter(d=>d.client===filtreClient);
-    if(filtreStatut!=="tous") {
+    if(filtreStatut!=="tous"){
       if(["ouvert","clos"].includes(filtreStatut)) base=base.filter(d=>d.statut===filtreStatut);
       else if(filtreStatut==="brouillon") base=base.filter(d=>!d.statutFacture);
       else base=base.filter(d=>d.statutFacture===filtreStatut);
     }
-    // Sort: validées en bas, reste par date décroissante
-    base.sort((a,b)=>{
-      const aVal=a.statutFacture==="validee"?1:0;
-      const bVal=b.statutFacture==="validee"?1:0;
-      if(aVal!==bVal) return aVal-bVal;
-      return b.dateCreation.localeCompare(a.dateCreation);
-    });
-    return base;
+    // Masquer les validées par défaut
+    const validees=base.filter(d=>d.statutFacture==="validee");
+    const actifs=base.filter(d=>d.statutFacture!=="validee");
+    // Trier actifs: plus récents en haut
+    actifs.sort((a,b)=>b.dateCreation.localeCompare(a.dateCreation));
+    validees.sort((a,b)=>b.dateCreation.localeCompare(a.dateCreation));
+    return showValidees ? [...actifs,...validees] : actifs;
+  })();
+  const nbValideesMois = (() => {
+    let base = dossiers.filter(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return mois===moisActif&&annee===anneeActive;});
+    return base.filter(d=>d.statutFacture==="validee").length;
   })();
   const caEstime=dossiersDuMois.reduce((s,d)=>s+genFacture(d,tarifs).ht,0);
+  // KPIs globaux (tous mois confondus)
+  const tousEnCours=dossiers.filter(d=>d.statut==="ouvert"&&d.statutFacture!=="validee");
+  const toutesEnStock=tousEnCours.reduce((s,d)=>{
+    const e=d.mouvements.filter(m=>m.type==="entree").reduce((a,m)=>a+m.palettes,0);
+    const so=d.mouvements.filter(m=>m.type==="sortie").reduce((a,m)=>a+m.palettes,0);
+    return s+Math.max(0,e-so);
+  },0);
   const enAttente=dossiers.filter(d=>d.statutFacture==="en_attente");
   const modifiees=dossiers.filter(d=>d.statutFacture==="modifiee");
   return (
@@ -412,22 +420,31 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
         </div>
       </div>
 
-      {/* FILTRES */}
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
-        <select style={{...sf.inp,width:"auto",padding:"6px 10px",fontSize:12}} value={filtreClient} onChange={e=>setFiltreClient(e.target.value)}>
-          <option value="tous">👥 Tous les clients</option>
-          {[...new Set(dossiers.map(d=>d.client))].sort().map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-        <select style={{...sf.inp,width:"auto",padding:"6px 10px",fontSize:12}} value={filtreStatut} onChange={e=>setFiltreStatut(e.target.value)}>
-          <option value="tous">📋 Tous les statuts</option>
-          <option value="ouvert">🟡 En cours</option>
-          <option value="clos">✅ Clôturé</option>
-          <option value="brouillon">📝 Brouillon</option>
-          <option value="en_attente">⏳ En attente</option>
-          <option value="validee">✅ Validée</option>
-          <option value="modifiee">⚠️ Modifiée</option>
-        </select>
-        {(filtreClient!=="tous"||filtreStatut!=="tous")&&<button onClick={()=>{setFiltreClient("tous");setFiltreStatut("tous");}} style={{...sf.btn("ghost",{padding:"6px 10px",fontSize:12})}}>✕ Réinitialiser</button>}
+      {/* BARRE FILTRES ET RECHERCHE */}
+      <div style={{...sf.card,padding:"12px 16px",marginBottom:12}}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,flex:1,minWidth:160}}>
+            <span>🔍</span>
+            <input style={{...sf.inp,flex:1,padding:"7px 10px",fontSize:12}} placeholder="Rechercher..." value={recherche} onChange={e=>setRecherche(e.target.value)}/>
+            {recherche&&<button onClick={()=>setRecherche("")} style={{background:"none",border:"none",color:C.grayText,cursor:"pointer",fontSize:16}}>✕</button>}
+          </div>
+          <select style={{...sf.inp,width:"auto",padding:"7px 10px",fontSize:12}} value={filtreClient} onChange={e=>setFiltreClient(e.target.value)}>
+            <option value="tous">👥 Tous</option>
+            {[...new Set(dossiers.map(d=>d.client))].sort().map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+          <select style={{...sf.inp,width:"auto",padding:"7px 10px",fontSize:12}} value={filtreStatut} onChange={e=>setFiltreStatut(e.target.value)}>
+            <option value="tous">📋 Tous statuts</option>
+            <option value="ouvert">🟡 En cours</option>
+            <option value="clos">✅ Clôturé</option>
+            <option value="brouillon">📝 Brouillon</option>
+            <option value="en_attente">⏳ En attente</option>
+            <option value="modifiee">⚠️ Modifiée</option>
+          </select>
+          <button onClick={()=>setShowValidees(v=>!v)} style={{...sf.btn(showValidees?"primary":"ghost",{padding:"7px 12px",fontSize:12,display:"flex",alignItems:"center",gap:4})}}>
+            ✅ Validées {nbValideesMois>0&&<span style={{background:showValidees?"rgba(255,255,255,0.3)":C.navy,color:"#fff",borderRadius:10,padding:"1px 6px",fontSize:10,fontWeight:700}}>{nbValideesMois}</span>}
+          </button>
+          {(filtreClient!=="tous"||filtreStatut!=="tous")&&<button onClick={()=>{setFiltreClient("tous");setFiltreStatut("tous");}} style={{...sf.btn("ghost",{padding:"7px 10px",fontSize:11})}}>✕</button>}
+        </div>
       </div>
 
             {role==="comptable"&&enAttente.length>0&&<div style={{background:"#fef3c7",border:"2px solid #f59e0b",borderRadius:12,padding:"14px 18px",marginBottom:10,fontFamily:"sans-serif"}}>
@@ -453,7 +470,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
 
       <div style={{...sf.card,padding:0,marginBottom:16}}>
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)"}}>
-          {[{val:dossiersDuMois.length,label:t.dossiers_nb,color:C.navy},{val:dossiersDuMois.filter(d=>d.statut==="ouvert").length,label:t.en_cours,color:"#d97706"},{val:dossiersDuMois.filter(d=>d.statut==="ouvert").reduce((s,d)=>{const e=d.mouvements.filter(m=>m.type==="entree").reduce((a,m)=>a+m.palettes,0);const so=d.mouvements.filter(m=>m.type==="sortie").reduce((a,m)=>a+m.palettes,0);return s+e-so;},0),label:t.palettes_stock,color:"#2563eb"},{val:caEstime.toFixed(0)+" €",label:t.ca_ht_mois,color:C.accent}].map((k,i)=>(
+          {[{val:dossiersDuMois.length,label:t.dossiers_nb,color:C.navy},{val:tousEnCours.length,label:t.en_cours+" (total)",color:"#d97706"},{val:toutesEnStock,label:t.palettes_stock+" (total)",color:"#2563eb"},{val:caEstime.toFixed(0)+" €",label:t.ca_ht_mois,color:C.accent}].map((k,i)=>(
             <div key={i} style={{textAlign:"center",padding:"20px 12px",borderRight:i<3?"1px solid "+C.border:"none"}}>
               <div style={{fontSize:28,fontWeight:800,color:k.color,fontFamily:"sans-serif"}}>{k.val}</div>
               <div style={{fontSize:10,color:C.grayText,fontFamily:"sans-serif",textTransform:"uppercase",letterSpacing:"0.08em",marginTop:4,fontWeight:600}}>{k.label}</div>
@@ -491,7 +508,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
                     {d.invoiceRef&&<span style={{color:C.accent,fontSize:12,fontWeight:600}}>#{d.invoiceRef}</span>}
                     {clientObj&&!clientObj.tva&&<span style={sf.pill("#92400e","#fef9c3",{fontSize:10})}>HT</span>}
                   </div>
-                  <div style={{fontSize:11,color:C.grayText,fontFamily:"sans-serif",marginTop:3}}>{formatDate(d.dateCreation)} · {d.mouvements.length} {t.mvt}{d.notes?" · "+d.notes:""}</div>
+                  <div style={{fontSize:11,color:C.grayText,fontFamily:"sans-serif",marginTop:3}}>{fDate(d.dateCreation)} · {d.mouvements.length} {t.mvt}{d.notes?" · "+d.notes:""}</div>
                 </div>
                 <span style={sf.pill(d.statut==="ouvert"?"#92400e":C.success,d.statut==="ouvert"?"#fef3c7":"#dcfce7")}>{d.statut==="ouvert"?t.en_cours:t.cloture}</span>
                 <Badge sf2={sf2} t={t}/>
@@ -514,7 +531,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
             </div>
             <div style={{padding:"8px 18px",display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid "+C.border,background:C.offWhite}}>
               {d.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(
-                <span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {formatDate(m.date)}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>
+                <span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {fDate(m.date)}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>
               ))}
             </div>
             {(d.photos||[]).length>0&&<div style={{padding:"6px 18px 10px",display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid "+C.border,background:C.offWhite}}>
@@ -529,23 +546,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
 
 
 // ─── GÉNÉRATION PDF PRO ─────────────────────────────────────────────────────
-function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, lang) {
-  const labels = {
-    fr: { title:"DÉPÔT HORS DFDS", emetteur:"Émetteur", client:"Client", mvts:"Mouvements de palettes",
-          designation:"Désignation", qte:"Qté", pu:"PU HT", total:"Total HT", totalHT:"Total HT",
-          tva:"TVA 20%", totalTTC:"TOTAL TTC", totalHTOnly:"TOTAL HT", exonere:"Client exonéré de TVA — Facturation HT uniquement",
-          notes:"Notes", footer:"Document généré le", entree:"Entrée", sortie:"Sortie" },
-    en: { title:"DEPOT OUTSIDE DFDS", emetteur:"Issuer", client:"Client", mvts:"Pallet movements",
-          designation:"Description", qte:"Qty", pu:"Unit price", total:"Total excl. VAT", totalHT:"Total excl. VAT",
-          tva:"VAT 20%", totalTTC:"TOTAL incl. VAT", totalHTOnly:"TOTAL excl. VAT", exonere:"Client exempt from VAT — Billing excl. VAT only",
-          notes:"Notes", footer:"Document generated on", entree:"Inbound", sortie:"Outbound" },
-    tr: { title:"DFDS DIŞI DEPO", emetteur:"Düzenleyen", client:"Müşteri", mvts:"Palet hareketleri",
-          designation:"Açıklama", qte:"Adet", pu:"Birim fiyat", total:"KDV hariç toplam", totalHT:"KDV hariç toplam",
-          tva:"KDV 20%", totalTTC:"TOPLAM (KDV dahil)", totalHTOnly:"TOPLAM (KDV hariç)", exonere:"Müşteri KDV'den muaf — Yalnızca KDV hariç faturalandırma",
-          notes:"Notlar", footer:"Belge oluşturulma tarihi", entree:"Giriş", sortie:"Çıkış" },
-  };
-  const L = labels[lang] || labels.fr;
-  const t = L; // use L for labels in PDF
+function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
   const clientObj = clients.find(c => c.nom === dossier.client) || {};
   const num = dossier.invoiceRef || ("DOS-" + dossier.id.toString().slice(-5));
   const dateDoc = new Date().toLocaleDateString("fr-FR");
@@ -610,20 +611,20 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, lang) {
 
   <div class="parties">
     <div class="party">
-      <div class="party-label">${L.emetteur}</div>
+      <div class="party-label">Émetteur</div>
       <div class="party-name">DFDS Logistics France SARL</div>
       <div class="party-sub">Route de Pontmartin · Zone Portuaire</div>
       <div class="party-sub">34200 Sète, France</div>
     </div>
     <div class="party">
-      <div class="party-label">${L.client}</div>
+      <div class="party-label">Client</div>
       <div class="party-name">${dossier.client}${clientObj.numero ? " · N°" + clientObj.numero : ""}</div>
       <div class="party-sub">${avecTVA ? "Facturation TTC (TVA 20%)" : "Facturation HT — Client exonéré de TVA"}</div>
     </div>
   </div>
 
   <div class="mvt-section">
-    <div class="section-title">${L.mvts}</div>
+    <div class="section-title">Mouvements de palettes</div>
     <div class="mvt-tags">
       ${dossier.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m =>
         `<span class="mvt-tag ${m.type}">${m.type==="entree"?"↓":"↑"} ${m.palettes} pal.${m.poids?" · "+m.poids+"kg":""} · ${m.date}${m.transporteur?" · 🚛"+m.transporteur:""}${m.provenance?" · "+m.provenance:""}</span>`
@@ -634,10 +635,10 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, lang) {
   <table>
     <thead>
       <tr>
-        <th>${L.designation}</th>
-        <th class="right">${L.qte}</th>
-        <th class="right">${L.pu}</th>
-        <th class="right">${L.total}</th>
+        <th>Désignation</th>
+        <th class="right">Qté</th>
+        <th class="right">PU HT</th>
+        <th class="right">Total HT</th>
       </tr>
     </thead>
     <tbody>
@@ -654,13 +655,13 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, lang) {
 
   <div class="totals">
     <div class="totals-box">
-      <div class="total-row"><span>${L.totalHT}</span><span>${ht.toFixed(2)} €</span></div>
+      <div class="total-row"><span>Total HT</span><span>${ht.toFixed(2)} €</span></div>
       ${avecTVA
-        ? `<div class="total-row"><span>${L.tva}</span><span>${tva.toFixed(2)} €</span></div>`
-        : `<div class="ht-only">⚠️ ${L.exonere}</div>`
+        ? `<div class="total-row"><span>TVA 20%</span><span>${tva.toFixed(2)} €</span></div>`
+        : `<div class="ht-only">⚠️ Client exonéré de TVA — Facturation HT uniquement</div>`
       }
       <div class="total-final">
-        <span>${avecTVA ? L.totalTTC : L.totalHTOnly}</span>
+        <span>${avecTVA ? "TOTAL TTC" : "TOTAL HT"}</span>
         <span>${ttc.toFixed(2)} €</span>
       </div>
     </div>
@@ -670,7 +671,7 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, lang) {
 
   <div class="footer">
     DFDS Logistics France SARL · SIRET : XXX XXX XXX XXXXX · TVA : FR XX XXX XXX XXX<br>
-    ${L.footer} ${dateDoc} · Dépôt Manager v2.0
+    Document généré le ${dateDoc} · Dépôt Manager v2.0
   </div>
 </body>
 </html>`;
@@ -683,7 +684,6 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, lang) {
 
 // ─── PAGE FACTURE ─────────────────────────────────────────────────────────────
 function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
-  const [pdfLang,setPdfLang]=useState("fr");
   const clientObj=clients.find(c=>c.nom===dossier.client)||{tva:true};
   const avecTVA=dossier.tvaClient!==undefined?dossier.tvaClient:clientObj.tva;
   const {lignes,ht}=genFacture(dossier,tarifs);
@@ -698,10 +698,7 @@ function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
           {role==="comptable"&&sf2==="en_attente"&&<button style={sf.btn("success")} onClick={()=>updateSF(dossier.id,"validee",setDossiers)}>✅ {t.marquer_facture}</button>}
           {role==="comptable"&&sf2==="modifiee"&&<button style={sf.btn("success")} onClick={()=>updateSF(dossier.id,"validee",setDossiers)}>✅ {t.revalider_facture}</button>}
           {role==="comptable"&&sf2==="validee"&&<button style={sf.btn("ghost",{fontSize:12})} onClick={()=>updateSF(dossier.id,null,setDossiers)}>🔓 {t.devalider}</button>}
-          <div style={{display:"flex",alignItems:"center",gap:4,background:C.offWhite,borderRadius:6,padding:3}}>
-            {["fr","en","tr"].map(l=><button key={l} onClick={()=>setPdfLang(l)} style={{background:pdfLang===l?C.navy:"transparent",color:pdfLang===l?"#fff":C.grayText,border:"none",padding:"4px 8px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"sans-serif"}}>{l.toUpperCase()}</button>)}
-          </div>
-          <button style={sf.btn("accent")} onClick={()=>genererPDF(dossier,clients,lignes,ht,tva,ttc,avecTVA,pdfLang)}>📄 {t.imprimer}</button>
+          <button style={sf.btn("accent")} onClick={()=>genererPDF(dossier,clients,lignes,ht,tva,ttc,avecTVA,t)}>📄 {t.imprimer}</button>
         </div>
       </div>
       <div style={sf.card}>
@@ -719,7 +716,7 @@ function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
         </div>
         <div style={{marginBottom:20}}>
           <div style={sf.sec}>{t.detail_mouvements}</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{dossier.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(<span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {formatDate(m.date)}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>))}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{dossier.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(<span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {fDate(m.date)}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>))}</div>
         </div>
         <div style={sf.sec}>{t.designation}</div>
         <div style={{overflowX:"auto"}}>
@@ -846,9 +843,6 @@ function PageExport({dossiers,clients,tarifs,t,lang}) {
           <div style={sf.sec}>{ddm.length} {t.dossiers_nb} — {moisNoms[mois]} {annee}</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <button style={sf.btn("ghost",{padding:"7px 14px",fontSize:12})} onClick={toggleAll}>{Object.keys(selection).length===ddm.length?t.deselectionner:t.selectionner_tout}</button>
-            <div style={{display:"flex",alignItems:"center",gap:4,background:C.offWhite,borderRadius:6,padding:3}}>
-              {["fr","en","tr"].map(l=><button key={l} onClick={()=>setPdfLang(l)} style={{background:pdfLang===l?C.navy:"transparent",color:pdfLang===l?"#fff":C.grayText,border:"none",padding:"4px 8px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"sans-serif"}}>{l.toUpperCase()}</button>)}
-            </div>
             <button style={sf.btn("success",{padding:"7px 14px",fontSize:12})} onClick={handleExport} disabled={sel.length===0}>📄 {t.exporter} {sel.length>0?"("+sel.length+")":""}</button>
           </div>
         </div>
@@ -859,7 +853,7 @@ function PageExport({dossiers,clients,tarifs,t,lang}) {
               <div style={{width:22,height:22,borderRadius:6,border:"2px solid "+(selection[d.id]?C.navy:C.grayMid),background:selection[d.id]?C.navy:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{selection[d.id]&&<span style={{color:"#fff",fontSize:14,lineHeight:1,fontWeight:700}}>✓</span>}</div>
               <div style={{flex:1,fontFamily:"sans-serif"}}>
                 <div style={{fontWeight:700,color:C.navy,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>{d.client}{co?.numero&&<span style={{fontSize:11,color:C.grayText,fontWeight:400}}>N°{co.numero}</span>}{d.invoiceRef&&<span style={{color:C.accent,fontWeight:600,fontSize:12}}>#{d.invoiceRef}</span>}<Badge sf2={d.statutFacture} t={t}/></div>
-                <div style={{fontSize:12,color:C.grayText,marginTop:2}}>{d.dateCreation} · {d.mouvements.filter(m=>m.type==="entree").reduce((s,m)=>s+m.palettes,0)} pal.</div>
+                <div style={{fontSize:12,color:C.grayText,marginTop:2}}>{fDate(d.dateCreation)} · {d.mouvements.filter(m=>m.type==="entree").reduce((s,m)=>s+m.palettes,0)} pal.</div>
               </div>
               <div style={{textAlign:"right",fontFamily:"sans-serif"}}>
                 <div style={{fontWeight:800,color:C.accent,fontSize:15}}>{ht.toFixed(2)} € HT</div>
