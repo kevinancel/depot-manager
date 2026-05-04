@@ -227,7 +227,22 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
   const photoRef=useRef(null);
   const cameraRef=useRef(null);
   const [photoViewer,setPhotoViewer]=useState(null);
-  const addPhotos=(files)=>{Array.from(files).forEach(file=>{const reader=new FileReader();reader.onload=(e)=>setPhotos(ph=>[...ph,{id:Date.now()+Math.random(),name:file.name,data:e.target.result}]);reader.readAsDataURL(file);});};
+  const [uploading,setUploading]=useState(false);
+  const addPhotos=async(files)=>{
+    setUploading(true);
+    for(const file of Array.from(files)){
+      try{
+        const ext=file.name.split(".").pop();
+        const fileName=Date.now()+"-"+Math.random().toString(36).slice(2)+"."+ext;
+        const {data,error}=await supabase.storage.from("photos").upload(fileName,file,{contentType:file.type});
+        if(!error){
+          const {data:urlData}=supabase.storage.from("photos").getPublicUrl(fileName);
+          setPhotos(ph=>[...ph,{id:Date.now()+Math.random(),name:file.name,url:urlData.publicUrl}]);
+        }
+      }catch(e){console.error(e);}
+    }
+    setUploading(false);
+  };
   const [erreur,setErreur]=useState("");
   const addMvt=()=>{if(mvt.palettes<1)return;setMouvements(m=>[...m,{...mvt,id:Date.now()}]);setMvt(v=>({...v,palettes:1,provenance:"",transporteur:"",poids:""}));};
   const addFrais=()=>{if(!frais.desc)return;const total=frais.type==="libre"?+frais.montant:+frais.qty*+frais.pu;setFraisSupp(f=>[...f,{...frais,total,id:Date.now()}]);setFrais({desc:"",type:"libre",montant:0,qty:1,pu:0});};
@@ -241,7 +256,7 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
       dateCreation:dossierInitial?.dateCreation||today(),statut:so>=e?"clos":"ouvert",
       tvaClient:clientObj.tva,statutFacture:wasValidee?"modifiee":(dossierInitial?.statutFacture||null)};
     const lignesSnap=genFacture({...dossierBase,lignesSnap:null},tarifs).lignes;
-    onSave({...dossierBase,lignesSnap,photos});
+    onSave({...dossierBase,lignesSnap,photos:photos.map(p=>({id:p.id,name:p.name,url:p.url||null}))});
   };
   const clientObj=clients.find(c=>c.nom===form.client);
   return (
@@ -326,13 +341,13 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}> 
           {photos.map((p,i)=>(
             <div key={p.id} style={{position:"relative"}}>
-              <img src={p.data} alt={p.name} onClick={()=>setPhotoViewer(p.data)} style={{width:90,height:90,objectFit:"cover",borderRadius:8,border:"1.5px solid "+C.border,cursor:"pointer"}}/>
+              <img src={p.url||p.data} alt={p.name} onClick={()=>setPhotoViewer(p.url||p.data)} style={{width:90,height:90,objectFit:"cover",borderRadius:8,border:"1.5px solid "+C.border,cursor:"pointer"}}/>
               <button onClick={()=>setPhotos(ph=>ph.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,cursor:"pointer",fontSize:13,fontWeight:700}}>✕</button>
             </div>
           ))}
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
-            <button onClick={()=>photoRef.current?.click()} style={{width:90,height:44,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>🖼️ Galerie</button>
-            <button onClick={()=>cameraRef.current?.click()} style={{width:90,height:44,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>📷 Photo</button>
+            <button onClick={()=>photoRef.current?.click()} disabled={uploading} style={{width:90,height:44,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>{uploading?"⏳...":"🖼️ Galerie"}</button>
+            <button onClick={()=>cameraRef.current?.click()} disabled={uploading} style={{width:90,height:44,border:"2px dashed "+C.border,borderRadius:8,background:C.offWhite,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4,color:C.grayText,fontFamily:"sans-serif",fontSize:11,fontWeight:600}}>{uploading?"⏳...":"📷 Photo"}</button>
           </div>
         </div>
         <input ref={photoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
@@ -521,7 +536,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
               ))}
             </div>
             {(d.photos||[]).length>0&&<div style={{padding:"6px 18px 10px",display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid "+C.border,background:C.offWhite}}>
-              {(d.photos||[]).map((p,i)=><img key={i} src={p.data} alt={p.name} style={{height:48,width:64,objectFit:"cover",borderRadius:6,border:"1px solid "+C.border}}/>)}
+              {(d.photos||[]).map((p,i)=><img key={i} src={p.url||p.data} alt={p.name} style={{height:48,width:64,objectFit:"cover",borderRadius:6,border:"1px solid "+C.border}}/>)}
             </div>}
           </div>;
         })}
@@ -939,7 +954,7 @@ export default function DepotManager() {
     async function charger(){
       const {data:d}=await supabase.from("dossiers").select("*");
       const {data:c}=await supabase.from("clients").select("*");
-      if(d) setDossiers(d.map(x=>({...x,dateCreation:x.date_creation,invoiceRef:x.invoice_ref,fraisSupp:x.frais_supp||[],lignesSnap:x.lignes_snap||null,tvaClient:x.tva_client,statutFacture:x.statut_facture||null,photos:x.photos||[]})));
+      if(d) setDossiers(d.map(x=>({...x,dateCreation:x.date_creation,invoiceRef:x.invoice_ref,fraisSupp:x.frais_supp||[],lignesSnap:x.lignes_snap||null,tvaClient:x.tva_client,statutFacture:x.statut_facture||null,photos:(x.photos||[]).map(p=>({...p,url:p.url||null}))})));
       if(c&&c.length>0) setClients(c.map(x=>({...x,numero:x.numero||""})));
       setChargement(false);
     }
