@@ -406,20 +406,6 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
   const modifiees=dossiers.filter(d=>d.statutFacture==="modifiee");
   return (
     <div>
-      {/* BARRE DE RECHERCHE */}
-      <div style={{...sf.card,padding:"12px 16px",marginBottom:12}}>
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <span style={{fontSize:16}}>🔍</span>
-          <input
-            style={{...sf.inp,flex:1,padding:"8px 12px",fontSize:13}}
-            placeholder="Rechercher par client, référence, plaque, notes..."
-            value={recherche}
-            onChange={e=>setRecherche(e.target.value)}
-          />
-          {recherche&&<button onClick={()=>setRecherche("")} style={{background:"none",border:"none",color:C.grayText,cursor:"pointer",fontSize:18,padding:"0 4px"}}>✕</button>}
-        </div>
-      </div>
-
       {/* BARRE FILTRES ET RECHERCHE */}
       <div style={{...sf.card,padding:"12px 16px",marginBottom:12}}>
         <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
