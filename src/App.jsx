@@ -122,6 +122,7 @@ const CLIENTS_INIT = [
 ];
 
 function today() { return new Date().toISOString().slice(0,10); }
+function formatDate(d) { if(!d) return ""; const [y,m,j]=d.split("-"); return j+"/"+m+"/"+y; }
 function daysBetween(a,b) { return Math.max(0,Math.round((new Date(b)-new Date(a))/86400000)); }
 function getMoisAnnee(date) { const d=new Date(date); return {mois:d.getMonth(),annee:d.getFullYear()}; }
 
@@ -224,6 +225,8 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
   const [frais,setFrais]=useState({desc:"",type:"libre",montant:0,qty:1,pu:0});
   const [photos,setPhotos]=useState(dossierInitial?.photos||[]);
   const photoRef=useRef(null);
+  const cameraRef=useRef(null);
+  const [photoViewer,setPhotoViewer]=useState(null);
   const addPhotos=(files)=>{Array.from(files).forEach(file=>{const reader=new FileReader();reader.onload=(e)=>setPhotos(ph=>[...ph,{id:Date.now()+Math.random(),name:file.name,data:e.target.result}]);reader.readAsDataURL(file);});};
   const [erreur,setErreur]=useState("");
   const addMvt=()=>{if(mvt.palettes<1)return;setMouvements(m=>[...m,{...mvt,id:Date.now()}]);setMvt(v=>({...v,palettes:1,provenance:"",transporteur:"",poids:""}));};
@@ -279,7 +282,7 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
           :mouvements.map((m,i)=>(
             <div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px",borderRadius:8,marginBottom:6,background:m.type==="entree"?"#eff6ff":"#fdf4ff",border:"1px solid "+(m.type==="entree"?"#bfdbfe":"#e9d5ff")}}>
               <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                <span style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.</span>
+                <span style={sf.tag(m.type)}>{m.type==="entree"?"↓ "+L.entree:"↑"} {m.palettes} pal.</span>
                 <span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>{m.date}</span>
                 {m.poids&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>⚖️ {m.poids}kg</span>}
                 {m.transporteur&&<span style={{fontFamily:"sans-serif",fontSize:12,color:C.grayText}}>🚛 {m.transporteur}</span>}
@@ -323,7 +326,7 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}> 
           {photos.map((p,i)=>(
             <div key={p.id} style={{position:"relative"}}>
-              <img src={p.data} alt={p.name} style={{width:90,height:90,objectFit:"cover",borderRadius:8,border:"1.5px solid "+C.border}}/>
+              <img src={p.data} alt={p.name} onClick={()=>setPhotoViewer(p.data)} style={{width:90,height:90,objectFit:"cover",borderRadius:8,border:"1.5px solid "+C.border,cursor:"pointer"}}/>
               <button onClick={()=>setPhotos(ph=>ph.filter((_,j)=>j!==i))} style={{position:"absolute",top:-6,right:-6,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:20,height:20,cursor:"pointer",fontSize:13,fontWeight:700}}>✕</button>
             </div>
           ))}
@@ -332,8 +335,16 @@ function FormDossier({clients,tarifs,dossierInitial,onSave,onCancel,t}) {
             <span>Ajouter</span>
           </button>
         </div>
-        <input ref={photoRef} type="file" accept="image/*" capture="environment" multiple style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
+        <input ref={photoRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>addPhotos(e.target.files)}/>
       </div>
+      {photoViewer&&(
+        <div onClick={()=>setPhotoViewer(null)} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.9)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{position:"relative",maxWidth:"100%",maxHeight:"100%"}}>
+            <img src={photoViewer} alt="photo" style={{maxWidth:"90vw",maxHeight:"85vh",objectFit:"contain",borderRadius:8}}/>
+            <button onClick={()=>setPhotoViewer(null)} style={{position:"absolute",top:-12,right:-12,background:C.danger,color:"#fff",border:"none",borderRadius:"50%",width:32,height:32,cursor:"pointer",fontSize:16,fontWeight:700}}>✕</button>
+          </div>
+        </div>
+      )}
       <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingBottom:32}}>
         {onCancel&&<button style={sf.btn("ghost")} onClick={onCancel}>{t.annuler}</button>}
         <button style={{...sf.btn("primary"),padding:"12px 32px",fontSize:14}} onClick={handleSave}>💾 {editing?t.enregistrer_modif:t.creer_dossier}</button>
@@ -348,22 +359,40 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
   const [moisActif,setMoisActif]=useState(now.getMonth());
   const [anneeActive,setAnneeActive]=useState(now.getFullYear());
   const [recherche,setRecherche]=useState("");
+  const [filtreClient,setFiltreClient]=useState("tous");
+  const [filtreStatut,setFiltreStatut]=useState("tous");
   const moisNoms=MOIS[lang]||MOIS.fr;
   const moisDispos=[...new Set(dossiers.map(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return annee+"-"+String(mois).padStart(2,"0")}))].sort().reverse();
   const moisActuelKey=now.getFullYear()+"-"+String(now.getMonth()).padStart(2,"0");
   if(!moisDispos.includes(moisActuelKey)) moisDispos.unshift(moisActuelKey);
-  const dossiersFiltresRecherche = recherche.trim()
-    ? dossiers.filter(d => {
-        const q = recherche.toLowerCase();
-        return (
-          d.client?.toLowerCase().includes(q) ||
-          d.invoiceRef?.toLowerCase().includes(q) ||
-          d.notes?.toLowerCase().includes(q) ||
-          d.mouvements?.some(m => m.transporteur?.toLowerCase().includes(q) || m.provenance?.toLowerCase().includes(q))
-        );
-      })
-    : null;
-  const dossiersDuMois = dossiersFiltresRecherche || dossiers.filter(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return mois===moisActif&&annee===anneeActive;});
+  const dossiersDuMois = (() => {
+    let base = recherche.trim()
+      ? dossiers
+      : dossiers.filter(d=>{const {mois,annee}=getMoisAnnee(d.dateCreation);return mois===moisActif&&annee===anneeActive;});
+    if(recherche.trim()) {
+      const q=recherche.toLowerCase();
+      base=base.filter(d=>
+        d.client?.toLowerCase().includes(q)||
+        d.invoiceRef?.toLowerCase().includes(q)||
+        d.notes?.toLowerCase().includes(q)||
+        d.mouvements?.some(m=>m.transporteur?.toLowerCase().includes(q)||m.provenance?.toLowerCase().includes(q))
+      );
+    }
+    if(filtreClient!=="tous") base=base.filter(d=>d.client===filtreClient);
+    if(filtreStatut!=="tous") {
+      if(["ouvert","clos"].includes(filtreStatut)) base=base.filter(d=>d.statut===filtreStatut);
+      else if(filtreStatut==="brouillon") base=base.filter(d=>!d.statutFacture);
+      else base=base.filter(d=>d.statutFacture===filtreStatut);
+    }
+    // Sort: validées en bas, reste par date décroissante
+    base.sort((a,b)=>{
+      const aVal=a.statutFacture==="validee"?1:0;
+      const bVal=b.statutFacture==="validee"?1:0;
+      if(aVal!==bVal) return aVal-bVal;
+      return b.dateCreation.localeCompare(a.dateCreation);
+    });
+    return base;
+  })();
   const caEstime=dossiersDuMois.reduce((s,d)=>s+genFacture(d,tarifs).ht,0);
   const enAttente=dossiers.filter(d=>d.statutFacture==="en_attente");
   const modifiees=dossiers.filter(d=>d.statutFacture==="modifiee");
@@ -383,7 +412,25 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
         </div>
       </div>
 
-      {role==="comptable"&&enAttente.length>0&&<div style={{background:"#fef3c7",border:"2px solid #f59e0b",borderRadius:12,padding:"14px 18px",marginBottom:10,fontFamily:"sans-serif"}}>
+      {/* FILTRES */}
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+        <select style={{...sf.inp,width:"auto",padding:"6px 10px",fontSize:12}} value={filtreClient} onChange={e=>setFiltreClient(e.target.value)}>
+          <option value="tous">👥 Tous les clients</option>
+          {[...new Set(dossiers.map(d=>d.client))].sort().map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <select style={{...sf.inp,width:"auto",padding:"6px 10px",fontSize:12}} value={filtreStatut} onChange={e=>setFiltreStatut(e.target.value)}>
+          <option value="tous">📋 Tous les statuts</option>
+          <option value="ouvert">🟡 En cours</option>
+          <option value="clos">✅ Clôturé</option>
+          <option value="brouillon">📝 Brouillon</option>
+          <option value="en_attente">⏳ En attente</option>
+          <option value="validee">✅ Validée</option>
+          <option value="modifiee">⚠️ Modifiée</option>
+        </select>
+        {(filtreClient!=="tous"||filtreStatut!=="tous")&&<button onClick={()=>{setFiltreClient("tous");setFiltreStatut("tous");}} style={{...sf.btn("ghost",{padding:"6px 10px",fontSize:12})}}>✕ Réinitialiser</button>}
+      </div>
+
+            {role==="comptable"&&enAttente.length>0&&<div style={{background:"#fef3c7",border:"2px solid #f59e0b",borderRadius:12,padding:"14px 18px",marginBottom:10,fontFamily:"sans-serif"}}>
         <div style={{fontWeight:700,color:"#92400e",fontSize:14,marginBottom:8}}>⏳ {enAttente.length} {t.en_attente_validation}</div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{enAttente.map(d=><button key={d.id} onClick={()=>onVoirFacture(d)} style={sf.btn("warning",{fontSize:12,padding:"5px 12px"})}>{d.client}{d.invoiceRef?" #"+d.invoiceRef:""}</button>)}</div>
       </div>}
@@ -444,7 +491,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
                     {d.invoiceRef&&<span style={{color:C.accent,fontSize:12,fontWeight:600}}>#{d.invoiceRef}</span>}
                     {clientObj&&!clientObj.tva&&<span style={sf.pill("#92400e","#fef9c3",{fontSize:10})}>HT</span>}
                   </div>
-                  <div style={{fontSize:11,color:C.grayText,fontFamily:"sans-serif",marginTop:3}}>{d.dateCreation} · {d.mouvements.length} {t.mvt}{d.notes?" · "+d.notes:""}</div>
+                  <div style={{fontSize:11,color:C.grayText,fontFamily:"sans-serif",marginTop:3}}>{formatDate(d.dateCreation)} · {d.mouvements.length} {t.mvt}{d.notes?" · "+d.notes:""}</div>
                 </div>
                 <span style={sf.pill(d.statut==="ouvert"?"#92400e":C.success,d.statut==="ouvert"?"#fef3c7":"#dcfce7")}>{d.statut==="ouvert"?t.en_cours:t.cloture}</span>
                 <Badge sf2={sf2} t={t}/>
@@ -467,7 +514,7 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
             </div>
             <div style={{padding:"8px 18px",display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid "+C.border,background:C.offWhite}}>
               {d.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(
-                <span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {m.date}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>
+                <span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {formatDate(m.date)}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>
               ))}
             </div>
             {(d.photos||[]).length>0&&<div style={{padding:"6px 18px 10px",display:"flex",gap:6,flexWrap:"wrap",borderTop:"1px solid "+C.border,background:C.offWhite}}>
@@ -482,7 +529,23 @@ function PageDossiers({dossiers,clients,tarifs,onVoirFacture,setDossiers,onModif
 
 
 // ─── GÉNÉRATION PDF PRO ─────────────────────────────────────────────────────
-function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
+function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, lang) {
+  const labels = {
+    fr: { title:"DÉPÔT HORS DFDS", emetteur:"Émetteur", client:"Client", mvts:"Mouvements de palettes",
+          designation:"Désignation", qte:"Qté", pu:"PU HT", total:"Total HT", totalHT:"Total HT",
+          tva:"TVA 20%", totalTTC:"TOTAL TTC", totalHTOnly:"TOTAL HT", exonere:"Client exonéré de TVA — Facturation HT uniquement",
+          notes:"Notes", footer:"Document généré le", entree:"Entrée", sortie:"Sortie" },
+    en: { title:"DEPOT OUTSIDE DFDS", emetteur:"Issuer", client:"Client", mvts:"Pallet movements",
+          designation:"Description", qte:"Qty", pu:"Unit price", total:"Total excl. VAT", totalHT:"Total excl. VAT",
+          tva:"VAT 20%", totalTTC:"TOTAL incl. VAT", totalHTOnly:"TOTAL excl. VAT", exonere:"Client exempt from VAT — Billing excl. VAT only",
+          notes:"Notes", footer:"Document generated on", entree:"Inbound", sortie:"Outbound" },
+    tr: { title:"DFDS DIŞI DEPO", emetteur:"Düzenleyen", client:"Müşteri", mvts:"Palet hareketleri",
+          designation:"Açıklama", qte:"Adet", pu:"Birim fiyat", total:"KDV hariç toplam", totalHT:"KDV hariç toplam",
+          tva:"KDV 20%", totalTTC:"TOPLAM (KDV dahil)", totalHTOnly:"TOPLAM (KDV hariç)", exonere:"Müşteri KDV'den muaf — Yalnızca KDV hariç faturalandırma",
+          notes:"Notlar", footer:"Belge oluşturulma tarihi", entree:"Giriş", sortie:"Çıkış" },
+  };
+  const L = labels[lang] || labels.fr;
+  const t = L; // use L for labels in PDF
   const clientObj = clients.find(c => c.nom === dossier.client) || {};
   const num = dossier.invoiceRef || ("DOS-" + dossier.id.toString().slice(-5));
   const dateDoc = new Date().toLocaleDateString("fr-FR");
@@ -547,20 +610,20 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
 
   <div class="parties">
     <div class="party">
-      <div class="party-label">Émetteur</div>
+      <div class="party-label">${L.emetteur}</div>
       <div class="party-name">DFDS Logistics France SARL</div>
       <div class="party-sub">Route de Pontmartin · Zone Portuaire</div>
       <div class="party-sub">34200 Sète, France</div>
     </div>
     <div class="party">
-      <div class="party-label">Client</div>
+      <div class="party-label">${L.client}</div>
       <div class="party-name">${dossier.client}${clientObj.numero ? " · N°" + clientObj.numero : ""}</div>
       <div class="party-sub">${avecTVA ? "Facturation TTC (TVA 20%)" : "Facturation HT — Client exonéré de TVA"}</div>
     </div>
   </div>
 
   <div class="mvt-section">
-    <div class="section-title">Mouvements de palettes</div>
+    <div class="section-title">${L.mvts}</div>
     <div class="mvt-tags">
       ${dossier.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m =>
         `<span class="mvt-tag ${m.type}">${m.type==="entree"?"↓":"↑"} ${m.palettes} pal.${m.poids?" · "+m.poids+"kg":""} · ${m.date}${m.transporteur?" · 🚛"+m.transporteur:""}${m.provenance?" · "+m.provenance:""}</span>`
@@ -571,10 +634,10 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
   <table>
     <thead>
       <tr>
-        <th>Désignation</th>
-        <th class="right">Qté</th>
-        <th class="right">PU HT</th>
-        <th class="right">Total HT</th>
+        <th>${L.designation}</th>
+        <th class="right">${L.qte}</th>
+        <th class="right">${L.pu}</th>
+        <th class="right">${L.total}</th>
       </tr>
     </thead>
     <tbody>
@@ -591,13 +654,13 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
 
   <div class="totals">
     <div class="totals-box">
-      <div class="total-row"><span>Total HT</span><span>${ht.toFixed(2)} €</span></div>
+      <div class="total-row"><span>${L.totalHT}</span><span>${ht.toFixed(2)} €</span></div>
       ${avecTVA
-        ? `<div class="total-row"><span>TVA 20%</span><span>${tva.toFixed(2)} €</span></div>`
-        : `<div class="ht-only">⚠️ Client exonéré de TVA — Facturation HT uniquement</div>`
+        ? `<div class="total-row"><span>${L.tva}</span><span>${tva.toFixed(2)} €</span></div>`
+        : `<div class="ht-only">⚠️ ${L.exonere}</div>`
       }
       <div class="total-final">
-        <span>${avecTVA ? "TOTAL TTC" : "TOTAL HT"}</span>
+        <span>${avecTVA ? L.totalTTC : L.totalHTOnly}</span>
         <span>${ttc.toFixed(2)} €</span>
       </div>
     </div>
@@ -607,7 +670,7 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
 
   <div class="footer">
     DFDS Logistics France SARL · SIRET : XXX XXX XXX XXXXX · TVA : FR XX XXX XXX XXX<br>
-    Document généré le ${dateDoc} · Dépôt Manager v2.0
+    ${L.footer} ${dateDoc} · Dépôt Manager v2.0
   </div>
 </body>
 </html>`;
@@ -620,6 +683,7 @@ function genererPDF(dossier, clients, lignes, ht, tva, ttc, avecTVA, t) {
 
 // ─── PAGE FACTURE ─────────────────────────────────────────────────────────────
 function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
+  const [pdfLang,setPdfLang]=useState("fr");
   const clientObj=clients.find(c=>c.nom===dossier.client)||{tva:true};
   const avecTVA=dossier.tvaClient!==undefined?dossier.tvaClient:clientObj.tva;
   const {lignes,ht}=genFacture(dossier,tarifs);
@@ -634,7 +698,10 @@ function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
           {role==="comptable"&&sf2==="en_attente"&&<button style={sf.btn("success")} onClick={()=>updateSF(dossier.id,"validee",setDossiers)}>✅ {t.marquer_facture}</button>}
           {role==="comptable"&&sf2==="modifiee"&&<button style={sf.btn("success")} onClick={()=>updateSF(dossier.id,"validee",setDossiers)}>✅ {t.revalider_facture}</button>}
           {role==="comptable"&&sf2==="validee"&&<button style={sf.btn("ghost",{fontSize:12})} onClick={()=>updateSF(dossier.id,null,setDossiers)}>🔓 {t.devalider}</button>}
-          <button style={sf.btn("accent")} onClick={()=>genererPDF(dossier,clients,lignes,ht,tva,ttc,avecTVA,t)}>📄 {t.imprimer}</button>
+          <div style={{display:"flex",alignItems:"center",gap:4,background:C.offWhite,borderRadius:6,padding:3}}>
+            {["fr","en","tr"].map(l=><button key={l} onClick={()=>setPdfLang(l)} style={{background:pdfLang===l?C.navy:"transparent",color:pdfLang===l?"#fff":C.grayText,border:"none",padding:"4px 8px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"sans-serif"}}>{l.toUpperCase()}</button>)}
+          </div>
+          <button style={sf.btn("accent")} onClick={()=>genererPDF(dossier,clients,lignes,ht,tva,ttc,avecTVA,pdfLang)}>📄 {t.imprimer}</button>
         </div>
       </div>
       <div style={sf.card}>
@@ -652,7 +719,7 @@ function PageFacture({dossier,clients,tarifs,onRetour,role,setDossiers,t}) {
         </div>
         <div style={{marginBottom:20}}>
           <div style={sf.sec}>{t.detail_mouvements}</div>
-          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{dossier.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(<span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {m.date}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>))}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{dossier.mouvements.sort((a,b)=>a.date.localeCompare(b.date)).map(m=>(<span key={m.id} style={sf.tag(m.type)}>{m.type==="entree"?"↓":"↑"} {m.palettes} pal.{m.poids?" · "+m.poids+"kg":""} · {formatDate(m.date)}{m.transporteur?" 🚛"+m.transporteur:""}{m.provenance?" · "+m.provenance:""}</span>))}</div>
         </div>
         <div style={sf.sec}>{t.designation}</div>
         <div style={{overflowX:"auto"}}>
@@ -779,6 +846,9 @@ function PageExport({dossiers,clients,tarifs,t,lang}) {
           <div style={sf.sec}>{ddm.length} {t.dossiers_nb} — {moisNoms[mois]} {annee}</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <button style={sf.btn("ghost",{padding:"7px 14px",fontSize:12})} onClick={toggleAll}>{Object.keys(selection).length===ddm.length?t.deselectionner:t.selectionner_tout}</button>
+            <div style={{display:"flex",alignItems:"center",gap:4,background:C.offWhite,borderRadius:6,padding:3}}>
+              {["fr","en","tr"].map(l=><button key={l} onClick={()=>setPdfLang(l)} style={{background:pdfLang===l?C.navy:"transparent",color:pdfLang===l?"#fff":C.grayText,border:"none",padding:"4px 8px",borderRadius:4,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"sans-serif"}}>{l.toUpperCase()}</button>)}
+            </div>
             <button style={sf.btn("success",{padding:"7px 14px",fontSize:12})} onClick={handleExport} disabled={sel.length===0}>📄 {t.exporter} {sel.length>0?"("+sel.length+")":""}</button>
           </div>
         </div>
@@ -807,7 +877,7 @@ function PageClients({clients,setClients,t}) {
   const [nc,setNc]=useState({nom:"",tva:true,numero:""});
   const [ed,setEd]=useState(null); const [err,setErr]=useState("");
   const add=async()=>{const nom=nc.nom.trim().toUpperCase();if(!nom){setErr(t.nom_requis);return;}if(clients.find(c=>c.nom===nom)){setErr(t.client_existe);return;}await supabase.from("clients").upsert({nom,tva:nc.tva,numero:nc.numero||""});setClients(cs=>[...cs,{nom,tva:nc.tva,numero:nc.numero||""}]);setNc({nom:"",tva:true,numero:""});setErr("");};
-  const saveEd=async(old)=>{const nom=ed.nom.trim().toUpperCase();if(!nom)return;if(nom!==old&&clients.find(c=>c.nom===nom)){setErr(t.client_existe);return;}await supabase.from("clients").delete().eq("nom",old);await supabase.from("clients").upsert({nom,tva:ed.tva,numero:ed.numero||""});setClients(cs=>cs.map(c=>c.nom===old?{nom,tva:ed.tva,numero:ed.numero||""}:c));setEd(null);setErr("");};
+  const saveEd=async(old)=>{const nom=ed.nom.trim().toUpperCase();if(!nom)return;if(nom!==old&&clients.find(c=>c.nom===nom)){setErr(t.client_existe);return;}await supabase.from("clients").update({nom,tva:ed.tva,numero:ed.numero||""}).eq("nom",old);setClients(cs=>cs.map(c=>c.nom===old?{nom,tva:ed.tva,numero:ed.numero||""}:c));setEd(null);setErr("");};
   const del=async(nom)=>{await supabase.from("clients").delete().eq("nom",nom);setClients(cs=>cs.filter(x=>x.nom!==nom));};
   return (
     <div>
